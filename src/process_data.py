@@ -1,31 +1,31 @@
 import pandas as pd
+from sklearn.preprocessing import StandardScaler
 
-DATA_PATH = "../data/credit_risk_dataset.csv"
-
-def read_data(file_path):
-    """Reads a CSV file and returns a DataFrame."""
+def read_data(filepath):
+    """Load CSV data and return DataFrame."""
     try:
-        return pd.read_csv(file_path)
+        return pd.read_csv(filepath)
     except FileNotFoundError:
-        raise FileNotFoundError(f"File {file_path} not found.")
+        raise FileNotFoundError(f"File {filepath} not found.")
 
-def preprocess_data(df):
-    """Preprocess the DataFrame by handling missing values and encoding categorical variables."""
-    # Example preprocessing steps
-    df = df.dropna()  # Drop rows with missing values
-    return df
+def clean_data(df):
+    """Drop rows with missing values."""
+    return df.dropna()
 
-def main():
-    # Read the data
-    df = read_data(DATA_PATH)
-    print("Data read successfully.")
+def encode_categoricals(df, categorical_cols):
+    """One-hot encode categorical features."""
+    return pd.get_dummies(df, columns=categorical_cols)
 
-    # Preprocess the data
-    df = preprocess_data(df)
-    print("Data preprocessed successfully.")
-
-    # Display the first few rows of the processed DataFrame
-    print(df.head())
+def scale_numeric(X):
+    """Scale features for neural net."""
+    scaler = StandardScaler()
+    return scaler.fit_transform(X), scaler
 
 if __name__ == "__main__":
-    main()
+    # Example usage for standalone testing
+    DATAPATH = "../data/credit_risk_dataset.csv"
+    df = read_data(DATAPATH)
+    df = clean_data(df)
+    cats = ['person_home_ownership','loan_intent','loan_grade','cb_person_default_on_file']
+    df = encode_categoricals(df, cats)
+    print(df.head())
