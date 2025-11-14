@@ -17,7 +17,6 @@ from sklearn.metrics import classification_report, confusion_matrix, roc_auc_sco
 # Load the data
 df = pd.read_csv("data/credit_risk_dataset.csv")
 
-# Separate features (X) and target (y)
 y = df["loan_status"]
 X = df.drop("loan_status", axis=1)
 
@@ -50,10 +49,10 @@ preprocessor = ColumnTransformer(
     ]
 )
 
-# Define the model pipeline (including class balancing)
+# Define the model pipeline
 model = Pipeline(steps=[
     ("preprocessor", preprocessor),
-    ("classifier", LogisticRegression(max_iter=1000, class_weight='balanced')) # Added class_weight='balanced'
+    ("classifier", LogisticRegression(max_iter=1000, class_weight='balanced'))
 ])
 
 
@@ -114,10 +113,10 @@ coef_df = pd.DataFrame({
     "Abs_Coefficient": np.abs(coefs)
 })
 
-# 3. Sort the full DataFrame by ABSOLUTE value in descending order (Greatest magnitude on top)
-# This DataFrame is used for both the table and the plot.
+# Sort the full DataFrame by abs value in descending order
 top_10_abs_sorted = coef_df.sort_values("Abs_Coefficient", ascending=False).head(10)
 
+# Create plot
 print("\nTOP 10 FEATURES BY ABSOLUTE COEFFICIENT:")
 print(tabulate(top_10_abs_sorted, headers="keys", tablefmt="psql"))
 

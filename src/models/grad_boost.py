@@ -10,7 +10,6 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
-# Changed from LogisticRegression to HistGradientBoostingClassifier
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score
 
@@ -53,13 +52,10 @@ preprocessor = ColumnTransformer(
     ]
 )
 
-# --- Model Definition (Swapped Classifier) ---
-# HistGradientBoostingClassifier is used. It handles class imbalance via sample weights
-# or class_weight, but it's simpler to use the 'auto' or default behavior for the first run.
+# Model defining
 
 model = Pipeline(steps=[
     ("preprocessor", preprocessor),
-    # Change classifier here:
     ("classifier", GradientBoostingClassifier(random_state=42)) 
     # Note: For imbalanced data, you might later tune 'sample_weight' 
     # during fitting, as it doesn't have a direct 'class_weight' parameter.
@@ -79,7 +75,7 @@ model.fit(X_train, y_train)
 preds = model.predict(X_test)
 probs = model.predict_proba(X_test)[:, 1]
 
-# --- Model Evaluation Outputs ---
+# Model eval
 
 # Confusion Matrix
 cm = confusion_matrix(y_test, preds)
@@ -109,38 +105,33 @@ print("\nROC-AUC SCORE:")
 print(roc_auc_score(y_test, probs))
 
 
-# --- Feature Importance Visualization (Adapted for Tree Models) ---
+# Feature importance viz
 
-# 1. Extract feature names and importances
-# Tree models use feature_importances_ instead of coef_
 importances = model.named_steps["classifier"].feature_importances_
 features = model.named_steps["preprocessor"].get_feature_names_out()
 
 
-# 2. Create the DataFrame
 importance_df = pd.DataFrame({
     "Feature": features,
     "Importance": importances,
 })
 
-# 3. Sort by Importance value in descending order
+
 top_10_sorted = importance_df.sort_values("Importance", ascending=False).head(10)
 
 print("\nTOP 10 FEATURES BY IMPURITY-BASED IMPORTANCE:")
 print(tabulate(top_10_sorted, headers="keys", tablefmt="psql"))
 
-# 4. Prepare plot order
 sorted_features_for_plot = top_10_sorted['Feature']
 
 
-# 5. Create the plot
 plt.figure(figsize=(10, 8))
 sns.barplot(
-    x='Importance',               # Use the Importance value on the X-axis
-    y='Feature',                  # Feature names on the Y-axis
-    data=top_10_sorted,           # Use the DataFrame sorted by importance
-    order=sorted_features_for_plot, # Explicitly set the y-axis order
-    color='skyblue'               # Use a single color since importance is always positive
+    x='Importance',              
+    y='Feature',                 
+    data=top_10_sorted,           
+    order=sorted_features_for_plot, 
+    color='skyblue'               
 )
 
 plt.title('Top 10 Gradient Boosting Feature Importances (Impurity-Based)')
