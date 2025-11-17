@@ -1,48 +1,53 @@
 import subprocess
 import os
+from pathlib import Path
 
-# Paths to model and analysis scripts (from project root)
-MODEL_SCRIPTS = {
-    "grad_boost": "./src/models/grad_boost.py",
-    "log_reg": "./src/models/log_reg.py",
-    "random_forest": "./src/models/random_forest.py",
-    "neural_net": "./src/models/neural_net.py"
+# Paths for scripts (adapt as necessary for your project structure)
+MODELSCRIPTS = {
+    "gradboost": "src/models/grad_boost.py",
+    "logreg": "src/models/log_reg.py",
+    "randomforest": "src/models/random_forest.py",
+    "neuralnet": "src/models/neural_net.py"
 }
-MODEL_OUTPUTS = {
-    "grad_boost": "./output/grad_boost_preds.csv",
-    "log_reg": "./output/log_reg_preds.csv",
-    "random_forest": "./output/random_forest_preds.csv",
-    "neural_net": "./output/neural_net_preds.csv"
-}
-ANALYSIS_SCRIPTS = [
-    "./src/analysis/compare_models.py",
-    "./src/analysis/plot_calibration.py",
-    "./src/analysis/feature_importance.py",
-    "./src/analysis/cross_validation.py"
+
+ANALYSISSCRIPTS = [
+    "src/analysis/feature_importance.py",
+    "src/analysis/plot_calibration.py",
+    "src/analysis/cross_validation.py",
 ]
 
-def run_script(filepath):
-    print(f"\nRunning {filepath} ...")
-    result = subprocess.run(['python', filepath], capture_output=True, text=True)
-    print(result.stdout)
-    if result.stderr:
-        print("Script error output:\n", result.stderr)
+ENSEMBLESCRIPT = "src/analysis/ensemble_methods.py"
+COMPAREMODELS = "src/analysis/compare_models.py"
+
+MODELOUTPUTS = {
+    "gradboost": "output/grad_boost_preds.csv",
+    "logreg": "output/log_reg_preds.csv",
+    "randomforest": "output/random_forest_preds.csv",
+    "neuralnet": "output/neural_net_preds.csv"
+}
 
 if __name__ == "__main__":
-    os.makedirs('./output', exist_ok=True)
-    os.makedirs('./data', exist_ok=True)
+    os.makedirs("output", exist_ok=True)
+    os.makedirs("data", exist_ok=True)
 
-    print("Checking model outputs and running models if needed:")
-    for model_key, script_path in MODEL_SCRIPTS.items():
-        output_file = MODEL_OUTPUTS[model_key]
+    # 1. Run all base model scripts
+    for key, script in MODELSCRIPTS.items():
+        output_file = MODELOUTPUTS[key]
         if not os.path.exists(output_file):
-            print(f"{output_file} not found, running {script_path}.")
-            run_script(script_path)
+            print(f"{output_file} not found, running {script}.")
+            subprocess.run(["python", script], check=True)
         else:
-            print(f"{output_file} already exists. Skipping {script_path}.")
+            print(f"{output_file} exists, skipping {script}.")
 
-    print("\nRunning analysis scripts:")
-    for script in ANALYSIS_SCRIPTS:
-        run_script(script)
+    # 2. Run analysis scripts for feature importance, calibration, and cross-validation
+    for script in ANALYSISSCRIPTS:
+        print(f"Running {script}...")
+        subprocess.run(["python", script], check=True)
 
-    print("\nAll tasks completed.")
+    # 3. Run ensemble method script to produce ensemble CSVs
+    print(f"Running ensemble methods: {ENSEMBLESCRIPT}...")
+    subprocess.run(["python", ENSEMBLESCRIPT], check=True)
+
+    # 4. Run compare_models to analyze all outputs (including ensembles)
+    print(f"Running model comparisons: {COMPAREMODELS}...")
+    subprocess.run(["python", COMPAREMODELS], check=True)
