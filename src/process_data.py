@@ -15,6 +15,7 @@ def load_raw():
     Load the raw credit risk dataset and return X, y (loan_status).
     """
     df = pd.read_csv(DATA_PATH)
+    df = df.drop("loan_grade", axis=1)  # Remove loan_grade - user doesn't know this value
     X = df.drop("loan_status", axis=1)
     y = df["loan_status"]
     return X, y

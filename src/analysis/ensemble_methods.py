@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from pathlib import Path
+import joblib
 
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, VotingClassifier
@@ -9,14 +10,27 @@ from sklearn.model_selection import train_test_split, KFold
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler
 
-OUTPUT_DIR = Path(__file__).parent.parent.parent / "output"
-DATA_PATH = Path(__file__).parent.parent.parent / "data" / "credit_risk_dataset.csv"
-OUTPUT_DIR.mkdir(exist_ok=True)
+# -------------------------------------------------------------------
+# Path setup
+# -------------------------------------------------------------------
+PROJECT_ROOT = Path(__file__).parent.parent.parent
+OUTPUT_DIR = PROJECT_ROOT / "output"
+DATA_PATH = PROJECT_ROOT / "data" / "credit_risk_dataset.csv"
+MODEL_SAVE_DIR = PROJECT_ROOT / "app" / "saved_models"
+
+# Create directories if they don't exist
+OUTPUT_DIR.mkdir(exist_ok=True, parents=True)
+MODEL_SAVE_DIR.mkdir(exist_ok=True, parents=True)
+
+print(f"Output directory: {OUTPUT_DIR}")
+print(f"Model save directory: {MODEL_SAVE_DIR}")
 
 # -------------------------------------------------------------------
-# Load data and single stratified train/test split
+# Load data and REMOVE loan_grade
 # -------------------------------------------------------------------
 df = pd.read_csv(DATA_PATH)
+df = df.drop("loan_grade", axis=1)  # Remove loan_grade - user doesn't know this value
+
 X = df.drop("loan_status", axis=1)
 y = df["loan_status"]
 
@@ -27,6 +41,10 @@ X_train_full, X_test_full, y_train_full, y_test_full = train_test_split(
     random_state=42,
     stratify=y,
 )
+
+print(f"Train set: {X_train_full.shape[0]} samples")
+print(f"Test set: {X_test_full.shape[0]} samples")
+print(f"Features: {X_train_full.shape[1]} (loan_grade removed)")
 
 # -------------------------------------------------------------------
 # One-hot encode + impute + scale (fit on TRAIN only)
@@ -66,6 +84,8 @@ X_test_scaled = pd.DataFrame(
     index=X_test_imp.index,
 )
 
+print(f"Features after preprocessing: {X_train_scaled.shape[1]}")
+
 # -------------------------------------------------------------------
 # Base models (fit ONLY on training data)
 # -------------------------------------------------------------------
@@ -74,11 +94,12 @@ rf = RandomForestClassifier(n_estimators=100, random_state=42)
 gb = GradientBoostingClassifier(n_estimators=100, random_state=42)
 nn = MLPClassifier(hidden_layer_sizes=(30, 15), max_iter=2000, random_state=42)
 
-# LR + NN on scaled; trees on imputed
+print("\nFitting base models...")
 lr.fit(X_train_scaled, y_train_full)
 nn.fit(X_train_scaled, y_train_full)
 rf.fit(X_train_imp, y_train_full)
 gb.fit(X_train_imp, y_train_full)
+print("Base models fitted.")
 
 # Store both train and test views per model
 base_models = [
@@ -91,27 +112,29 @@ base_models = [
 # -------------------------------------------------------------------
 # SOFT VOTING (predict on TEST only)
 # -------------------------------------------------------------------
+print("\nBuilding Voting ensemble...")
 voting = VotingClassifier(
     estimators=[("lr", lr), ("rf", rf), ("gb", gb), ("nn", nn)],
     voting="soft",
 )
 
-# VotingClassifier works on a single feature matrix; use scaled version
 voting.fit(X_train_scaled, y_train_full)
 voting_probs = voting.predict_proba(X_test_scaled)[:, 1]
 voting_preds = voting.predict(X_test_scaled)
 
 pd.DataFrame(
     {
-        "y_true": y_test_full,
+        "y_true": y_test_full.values,
         "y_pred_prob": voting_probs,
         "y_pred": voting_preds,
     }
 ).to_csv(OUTPUT_DIR / "ensemble_voting_preds.csv", index=False)
+print("Voting predictions saved.")
 
 # -------------------------------------------------------------------
 # BAGGING (average probabilities from base models on TEST only)
 # -------------------------------------------------------------------
+print("\nBuilding Bagging ensemble...")
 bagging_probs = np.mean(
     [
         model.predict_proba(X_test_use)[:, 1]
@@ -123,15 +146,17 @@ bagging_preds = (bagging_probs > 0.5).astype(int)
 
 pd.DataFrame(
     {
-        "y_true": y_test_full,
+        "y_true": y_test_full.values,
         "y_pred_prob": bagging_probs,
         "y_pred": bagging_preds,
     }
 ).to_csv(OUTPUT_DIR / "ensemble_bagging_preds.csv", index=False)
+print("Bagging predictions saved.")
 
 # -------------------------------------------------------------------
 # STACKING (OOF on TRAIN, evaluate on TEST)
 # -------------------------------------------------------------------
+print("\nBuilding Stacking ensemble...")
 kf = KFold(n_splits=5, shuffle=True, random_state=42)
 n_train = X_train_imp.shape[0]
 n_test = X_test_imp.shape[0]
@@ -140,9 +165,10 @@ meta_features_train = np.zeros((n_train, len(base_models)))
 meta_features_test = np.zeros((n_test, len(base_models)))
 
 for i, (name, base, Xtr_use, Xte_use) in enumerate(base_models):
+    print(f"  OOF predictions for {name}...")
     # Out-of-fold predictions for TRAIN
     oof_preds = np.zeros(n_train)
-    for train_idx, val_idx in kf.split(Xtr_use, y_train_full):
+    for fold_idx, (train_idx, val_idx) in enumerate(kf.split(Xtr_use, y_train_full)):
         # clone the base estimator
         base_clone = type(base)(**base.get_params())
         base_clone.fit(Xtr_use.iloc[train_idx], y_train_full.iloc[train_idx])
@@ -166,16 +192,17 @@ stack_preds = (stack_probs > 0.5).astype(int)
 
 pd.DataFrame(
     {
-        "y_true": y_test_full,
+        "y_true": y_test_full.values,
         "y_pred_prob": stack_probs,
         "y_pred": stack_preds,
     }
 ).to_csv(OUTPUT_DIR / "ensemble_stacking_preds.csv", index=False)
+print("Stacking predictions saved.")
 
 # -------------------------------------------------------------------
 # BLENDING (outer train/test; inner train/blend on TRAIN)
 # -------------------------------------------------------------------
-# Meta-features from base models on TRAIN and TEST
+print("\nBuilding Blending ensemble...")
 meta_train_full = np.column_stack(
     [model.predict_proba(Xtr_use)[:, 1] for (_, model, Xtr_use, _) in base_models]
 )
@@ -183,7 +210,6 @@ meta_test_full = np.column_stack(
     [model.predict_proba(Xte_use)[:, 1] for (_, model, _, Xte_use) in base_models]
 )
 
-# Inner split on TRAIN meta-features for blending
 X_meta_train, X_meta_blend, y_meta_train, y_meta_blend = train_test_split(
     meta_train_full,
     y_train_full,
@@ -204,10 +230,36 @@ blend_preds = (blend_probs > 0.5).astype(int)
 
 pd.DataFrame(
     {
-        "y_true": y_test_full,
+        "y_true": y_test_full.values,
         "y_pred_prob": blend_probs,
         "y_pred": blend_preds,
     }
 ).to_csv(OUTPUT_DIR / "ensemble_blending_preds.csv", index=False)
+print("Blending predictions saved.")
 
-print("All ensemble outputs (Voting, Bagging, Stacking, Blending) written using a clean train/test split.")
+# -------------------------------------------------------------------
+# Save trained Stacking model for deployment
+# -------------------------------------------------------------------
+print("\nSaving Stacking model for deployment...")
+stacking_artifacts = {
+    'base_models': {
+        'lr': lr,
+        'rf': rf,
+        'gb': gb,
+        'nn': nn,
+    },
+    'meta_learner': stacker,
+    'meta_scaler': stack_scaler,
+    'feature_imputer': imputer,
+    'feature_scaler': scaler,
+    'feature_names': list(X_train_imp.columns),
+}
+
+model_path = MODEL_SAVE_DIR / "stacking_model.pkl"
+joblib.dump(stacking_artifacts, model_path)
+print(f"Model saved to: {model_path}")
+
+print("\n" + "="*70)
+print("All ensemble outputs written using a clean train/test split.")
+print(f"Model saved for deployment at: {model_path}")
+print("="*70)

@@ -10,8 +10,9 @@ DATA_PATH = Path(__file__).parent.parent.parent / "data" / "credit_risk_dataset.
 OUTPUT_PATH = Path(__file__).parent.parent.parent / "output"
 OUTPUT_PATH.mkdir(exist_ok=True)
 
-CATS = ['person_home_ownership','loan_intent','loan_grade','cb_person_default_on_file']
+CATS = ['person_home_ownership','loan_intent','cb_person_default_on_file']
 df = pd.read_csv(DATA_PATH)
+df = df.drop('loan_grade', axis=1)  # Remove loan_grade - user doesn't know this value
 df = df.dropna()
 df = pd.get_dummies(df, columns=CATS)
 X = df.drop('loan_status', axis=1).values

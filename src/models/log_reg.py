@@ -13,6 +13,7 @@ OUTPUT_PATH = Path(__file__).parent.parent.parent / "output"
 OUTPUT_PATH.mkdir(exist_ok=True)
 
 df = pd.read_csv(DATA_PATH)
+df = df.drop("loan_grade", axis=1)  # Remove loan_grade - user doesn't know this value
 y = df["loan_status"]
 X = df.drop("loan_status", axis=1)
 numeric_features = X.select_dtypes(include=["int64","float64"]).columns.tolist()

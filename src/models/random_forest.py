@@ -8,8 +8,9 @@ OUTPUT_PATH = Path(__file__).parent.parent.parent / "output"
 OUTPUT_PATH.mkdir(exist_ok=True)
 
 df = pd.read_csv(DATA_PATH)
-cats = ['person_home_ownership','loan_intent','loan_grade','cb_person_default_on_file']
+cats = ['person_home_ownership','loan_intent','cb_person_default_on_file']
 df = pd.get_dummies(df, columns=cats)
+df = df.drop("loan_grade", axis=1)  # Remove loan_grade - user doesn't know this value
 X = df.drop("loan_status", axis=1)
 y = df["loan_status"]
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
