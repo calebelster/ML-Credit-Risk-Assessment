@@ -99,9 +99,9 @@ lines.append("\n# Confusion Matrices\n")
 for model, row in df_metrics.iterrows():
     conf = np.array(row['Confusion Matrix'])
     lines.append(f"## {model}\n")
-    lines.append("|       | Pred 0 | Pred 1 |")
-    lines.append("|-------|--------|--------|")
-    lines.append(f"| Actual 0 | {conf[0][0]} | {conf[0][1]} |")
+    lines.append("|       | Pred 0 | Pred 1 |\n")
+    lines.append("|-------|--------|--------|\n")
+    lines.append(f"| Actual 0 | {conf[0][0]} | {conf[0][1]} |\n")
     lines.append(f"| Actual 1 | {conf[1][0]} | {conf[1][1]} |\n")
 
 lines.append("\n# K-Fold CV Metrics\n")
@@ -121,10 +121,10 @@ for model, file in files.items():
         ks_stats.append(ks_statistic(yt, yp))
         loglosses.append(log_loss(yt, yp))
     lines.append(f"## {model} KFold CV\n")
-    lines.append("| Fold | AUC | PR_AUC | Brier | KS | LogLoss |")
-    lines.append("|------|-----|--------|--------|-----|---------|")
+    lines.append("| Fold | AUC | PR_AUC | Brier | KS | LogLoss |\n")
+    lines.append("|------|-----|--------|--------|-----|---------|\n")
     for i in range(5):
-        lines.append(f"| {i+1} | {aucs[i]:.3f} | {pr_aucs[i]:.3f} | {briers[i]:.3f} | {ks_stats[i]:.3f} | {loglosses[i]:.3f} |")
+        lines.append(f"| {i+1} | {aucs[i]:.3f} | {pr_aucs[i]:.3f} | {briers[i]:.3f} | {ks_stats[i]:.3f} | {loglosses[i]:.3f} |\n")
     lines.append("")
 
 md_file.write_text("".join(lines))

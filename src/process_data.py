@@ -1,31 +1,92 @@
+from pathlib import Path
 import pandas as pd
+
+from sklearn.model_selection import train_test_split
+from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler
 
-def read_data(filepath):
-    """Load CSV data and return DataFrame."""
-    try:
-        return pd.read_csv(filepath)
-    except FileNotFoundError:
-        raise FileNotFoundError(f"File {filepath} not found.")
+DATA_PATH = Path(__file__).parent.parent.parent / "data" / "credit_risk_dataset.csv"
+OUTPUT_DIR = Path(__file__).parent.parent.parent / "output"
+OUTPUT_DIR.mkdir(exist_ok=True)
 
-def clean_data(df):
-    """Drop rows with missing values."""
-    return df.dropna()
 
-def encode_categoricals(df, categorical_cols):
-    """One-hot encode categorical features."""
-    return pd.get_dummies(df, columns=categorical_cols)
+def load_raw():
+    """
+    Load the raw credit risk dataset and return X, y (loan_status).
+    """
+    df = pd.read_csv(DATA_PATH)
+    X = df.drop("loan_status", axis=1)
+    y = df["loan_status"]
+    return X, y
 
-def scale_numeric(X):
-    """Scale features for neural net."""
+
+def make_train_test(test_size: float = 0.2,
+                    random_state: int = 42,
+                    stratify: bool = True):
+    """
+    Create a single train/test split on the raw features.
+
+    Returns
+    -------
+    X_train, X_test, y_train, y_test
+    """
+    X, y = load_raw()
+    strat = y if stratify else None
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y,
+        test_size=test_size,
+        random_state=random_state,
+        stratify=strat,
+    )
+    return X_train, X_test, y_train, y_test
+
+
+def preprocess_tabular(X_train, X_test):
+    """
+    Apply one-hot encoding + median imputation + standard scaling.
+
+    Returns
+    -------
+    X_train_imp : pd.DataFrame  # imputed, not scaled (for trees)
+    X_test_imp  : pd.DataFrame
+    X_train_scaled : pd.DataFrame  # imputed + scaled (for LR/NN)
+    X_test_scaled  : pd.DataFrame
+    enc_columns : list[str]  # column names after one-hot encoding
+    imputer : fitted SimpleImputer
+    scaler : fitted StandardScaler
+    """
+    # One-hot encode train and test, then align columns
+    X_train_enc = pd.get_dummies(X_train)
+    X_test_enc = pd.get_dummies(X_test)
+
+    X_train_enc, X_test_enc = X_train_enc.align(
+        X_test_enc, join="left", axis=1, fill_value=0
+    )
+
+    # Median imputation
+    imputer = SimpleImputer(strategy="median")
+    X_train_imp = pd.DataFrame(
+        imputer.fit_transform(X_train_enc),
+        columns=X_train_enc.columns,
+        index=X_train_enc.index,
+    )
+    X_test_imp = pd.DataFrame(
+        imputer.transform(X_test_enc),
+        columns=X_train_enc.columns,
+        index=X_test_enc.index,
+    )
+
+    # Standard scaling
     scaler = StandardScaler()
-    return scaler.fit_transform(X), scaler
+    X_train_scaled = pd.DataFrame(
+        scaler.fit_transform(X_train_imp),
+        columns=X_train_imp.columns,
+        index=X_train_imp.index,
+    )
+    X_test_scaled = pd.DataFrame(
+        scaler.transform(X_test_imp),
+        columns=X_train_imp.columns,
+        index=X_test_imp.index,
+    )
 
-if __name__ == "__main__":
-    # Example usage for standalone testing
-    DATAPATH = "../data/credit_risk_dataset.csv"
-    df = read_data(DATAPATH)
-    df = clean_data(df)
-    cats = ['person_home_ownership','loan_intent','loan_grade','cb_person_default_on_file']
-    df = encode_categoricals(df, cats)
-    print(df.head())
+    return X_train_imp, X_test_imp, X_train_scaled, X_test_scaled, list(X_train_enc.columns), imputer, scaler
