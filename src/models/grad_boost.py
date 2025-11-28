@@ -1,141 +1,56 @@
 import pandas as pd
-import numpy as np
-from tabulate import tabulate
-import seaborn as sns
-import matplotlib.pyplot as plt
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import classification_report, roc_auc_score
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import OneHotEncoder
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.ensemble import GradientBoostingClassifier
-from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score
+from pathlib import Path
 
+DATA_PATH = Path(__file__).parent.parent.parent / "data" / "credit_risk_dataset.csv"
+OUTPUT_PATH = Path(__file__).parent.parent.parent / "output"
+OUTPUT_PATH.mkdir(exist_ok=True)
 
-# Load the data
-df = pd.read_csv("data/credit_risk_dataset.csv")
-
-# Separate features (X) and target (y)
+df = pd.read_csv(DATA_PATH)
+df = df.drop("loan_grade", axis=1)  # Remove loan_grade - user doesn't know this value
 y = df["loan_status"]
 X = df.drop("loan_status", axis=1)
 
-
-# Identify feature types
 numeric_features = X.select_dtypes(include=["int64", "float64"]).columns.tolist()
 categorical_features = X.select_dtypes(include=["object"]).columns.tolist()
 
-
-# --- Preprocessing Pipeline (Same as LogReg, but StandardScaler is not strictly necessary for tree models) ---
-
-numeric_transformer = Pipeline(steps=[
-    # Impute missing numeric values with the median
+numeric_transformer = Pipeline([
     ("imputer", SimpleImputer(strategy="median")),
-    # Scaling is optional for tree models but kept for consistency/safety
-    ("scaler", StandardScaler()) 
+    ("scaler", StandardScaler())
 ])
-
-categorical_transformer = Pipeline(steps=[
-    # Impute missing categorical values with the most frequent value
+categorical_transformer = Pipeline([
     ("imputer", SimpleImputer(strategy="most_frequent")),
-    # One-Hot Encode categorical features. HistGBM can handle categories natively, 
-    # but OneHot is safer with the ColumnTransformer setup.
     ("onehot", OneHotEncoder(handle_unknown="ignore"))
 ])
-
-# Create the preprocessor using ColumnTransformer
 preprocessor = ColumnTransformer(
     transformers=[
         ("num", numeric_transformer, numeric_features),
         ("cat", categorical_transformer, categorical_features)
     ]
 )
-
-# Model defining
-
-model = Pipeline(steps=[
+model = Pipeline([
     ("preprocessor", preprocessor),
-    ("classifier", GradientBoostingClassifier(random_state=42)) 
-    # Note: For imbalanced data, you might later tune 'sample_weight' 
-    # during fitting, as it doesn't have a direct 'class_weight' parameter.
+    ("classifier", GradientBoostingClassifier(random_state=42))
 ])
 
-# Split data
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=42, stratify=y
-)
-
-
-# Train the model
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
 model.fit(X_train, y_train)
-
-
-# Make predictions
 preds = model.predict(X_test)
 probs = model.predict_proba(X_test)[:, 1]
 
-# Model eval
-
-# Confusion Matrix
-cm = confusion_matrix(y_test, preds)
-class_labels = sorted(list(set(y_test)))
-
-plt.figure(figsize=(6, 5))
-sns.heatmap(
-    cm,
-    annot=True,
-    fmt='d',
-    cmap='Blues',
-    xticklabels=['Not Default', 'Default'],
-    yticklabels=['Not Default', 'Default']
-)
-plt.title('Confusion Matrix (Gradient Boost Model)')
-plt.ylabel('Actual Label')
-plt.xlabel('Predicted Label')
-plt.show()
-
-print("\nCONFUSION MATRIX:")
-print(confusion_matrix(y_test, preds))
-
-print("\nCLASSIFICATION REPORT:")
-print(classification_report(y_test, preds))
-
-print("\nROC-AUC SCORE:")
-print(roc_auc_score(y_test, probs))
-
-
-# Feature importance viz
+results = pd.DataFrame({'y_true': y_test, 'y_pred_prob': probs, 'y_pred': preds})
+results.to_csv(OUTPUT_PATH / "grad_boost_preds.csv", index=False)
 
 importances = model.named_steps["classifier"].feature_importances_
 features = model.named_steps["preprocessor"].get_feature_names_out()
+importance_df = pd.DataFrame({"Feature": features, "Importance": importances})
+importance_df.to_csv(OUTPUT_PATH / "grad_boost_importances.csv", index=False)
 
-
-importance_df = pd.DataFrame({
-    "Feature": features,
-    "Importance": importances,
-})
-
-
-top_10_sorted = importance_df.sort_values("Importance", ascending=False).head(10)
-
-print("\nTOP 10 FEATURES BY IMPURITY-BASED IMPORTANCE:")
-print(tabulate(top_10_sorted, headers="keys", tablefmt="psql"))
-
-sorted_features_for_plot = top_10_sorted['Feature']
-
-
-plt.figure(figsize=(10, 8))
-sns.barplot(
-    x='Importance',              
-    y='Feature',                 
-    data=top_10_sorted,           
-    order=sorted_features_for_plot, 
-    color='skyblue'               
-)
-
-plt.title('Top 10 Gradient Boosting Feature Importances (Impurity-Based)')
-plt.xlabel('Feature Importance (Gini/Impurity)')
-plt.ylabel('Feature')
-plt.grid(axis='x', linestyle='--', alpha=0.6)
-plt.show()
+print("ROC-AUC:", roc_auc_score(y_test, probs))
+print("Classification report:\n", classification_report(y_test, preds))

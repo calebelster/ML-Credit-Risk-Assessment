@@ -1,0 +1,5 @@
+,Brier Score
+Random Forest,0.06741054166027313
+Gradient Boost,0.07004389611055577
+Logistic Regression,0.15263337501283755
+Neural Net,0.1437634752458268
