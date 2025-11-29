@@ -59,7 +59,21 @@
             </Attribute>
           </value>
         </entry>
+        <entry key="\output\model_brier_scores.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
         <entry key="\output\model_comparison_metrics.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\output\neural_net_preds.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />
