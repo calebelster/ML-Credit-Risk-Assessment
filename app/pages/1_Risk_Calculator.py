@@ -3,6 +3,7 @@ import pandas as pd
 from pathlib import Path
 import sys
 
+# Add app directory to path
 app_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(app_dir))
 
@@ -18,7 +19,7 @@ st.markdown("**Assess loan default risk for individual or batch applications**")
 predictor = CreditRiskPredictor()
 processor = DataProcessor()
 
-# Add threshold slider in sidebar
+# Sidebar threshold
 st.sidebar.markdown("### ⚙️ Model Settings")
 decision_threshold = st.sidebar.slider(
     "Decision Threshold",
@@ -26,18 +27,12 @@ decision_threshold = st.sidebar.slider(
     max_value=0.70,
     value=0.50,
     step=0.05,
-    help="Lower threshold = more conservative (catches more defaults, more false positives). Higher threshold = more lenient (approves more loans, misses some defaults)."
+    help="Lower threshold = more conservative (catch more defaults). Higher threshold = more lenient (approve more loans)."
 )
 
-st.sidebar.markdown(f"""
-#### Current Threshold: {decision_threshold:.2f}
-- **Precision** (at 0.50): ~93% - Few false approvals
-- **Recall** (at 0.50): ~69% - Catches most defaults
-- Lower threshold (0.30-0.40): More conservative
-- Higher threshold (0.60-0.70): More lenient
-""")
+st.sidebar.markdown(f"**Current Threshold:** {decision_threshold:.2f}")
 
-# Tabs for single vs batch
+# Tabs
 tab1, tab2 = st.tabs(["Single Application", "Batch Upload"])
 
 # ===================== TAB 1: SINGLE APPLICATION =====================
@@ -56,62 +51,58 @@ with tab1:
         loan_int_rate = st.number_input("Interest Rate (%)", min_value=0.0, max_value=50.0, value=7.5)
         cb_person_cred_hist_length = st.number_input("Credit History Length (years)", min_value=0, value=10)
         person_home_ownership = st.selectbox("Home Ownership", ["RENT", "OWN", "MORTGAGE", "OTHER"])
-        cb_person_default_on_file = st.selectbox("Prior Default?", ["N", "Y"])
+        cb_person_default_on_file = st.selectbox("Prior Default on File?", ["N", "Y"])
 
-    loan_intent = st.selectbox("Loan Intent",
-                               ["PERSONAL", "EDUCATION", "MEDICAL", "VENTURE", "HOMEIMPROVEMENT", "DEBTCONSOLIDATION"])
+    loan_intent = st.selectbox(
+        "Loan Intent",
+        ["PERSONAL", "EDUCATION", "MEDICAL", "VENTURE", "HOMEIMPROVEMENT", "DEBTCONSOLIDATION"],
+    )
 
-    # Calculate loan_percent_income
-    if person_income > 0:
-        loan_percent_income = loan_amnt / person_income
-    else:
-        loan_percent_income = 0
-
-    # Predict button
     if st.button("🔍 Calculate Risk", key="single_predict"):
         try:
             form_data = {
-                'person_age': person_age,
-                'person_income': person_income,
-                'person_emp_length': person_emp_length,
-                'loan_amnt': loan_amnt,
-                'loan_int_rate': loan_int_rate,
-                'cb_person_cred_hist_length': cb_person_cred_hist_length,
-                'cb_person_default_on_file': cb_person_default_on_file,
-                'person_home_ownership': person_home_ownership,
-                'loan_intent': loan_intent,
+                "person_age": person_age,
+                "person_income": person_income,
+                "person_emp_length": person_emp_length,
+                "loan_amnt": loan_amnt,
+                "loan_int_rate": loan_int_rate,
+                "cb_person_cred_hist_length": cb_person_cred_hist_length,
+                "cb_person_default_on_file": cb_person_default_on_file,
+                "person_home_ownership": person_home_ownership,
+                "loan_intent": loan_intent,
             }
 
             df = processor.form_to_dataframe(form_data)
             result = predictor.predict_batch(df, threshold=decision_threshold)
 
-            # Display result
-            risk_score = result['risk_score_percent'].values[0]
-            risk_category = result['risk_category'].values[0]
-            default_prob = result['default_probability'].values[0]
+            risk_score = result["risk_score_percent"].values[0]
+            default_prob = result["default_probability"].values[0]
+            risk_category = result["risk_category"].values[0]
 
             st.success("✅ Prediction Complete")
 
-            col_result1, col_result2, col_result3 = st.columns(3)
-            with col_result1:
+            col_res1, col_res2, col_res3 = st.columns(3)
+            with col_res1:
                 st.metric("Risk Score", f"{risk_score:.1f}%")
-            with col_result2:
+            with col_res2:
                 st.metric("Default Probability", f"{default_prob:.1%}")
-            with col_result3:
-                color = "🔴" if risk_category == "High Risk" else "🟡" if risk_category == "Medium Risk" else "🟢"
-                st.metric("Risk Category", f"{color} {risk_category}")
+            with col_res3:
+                st.metric("Risk Category", risk_category)
 
-            st.markdown("---")
             st.markdown(f"**Decision Threshold Used:** {decision_threshold:.2f}")
 
-            # Interpretation
+            # Tailored feedback
+            feedback = processor.generate_application_feedback(df.iloc[0], default_prob)
+
             st.markdown("---")
-            if risk_score < 30:
-                st.info("✅ **Low Risk** - Strong probability of repayment. Recommend approval.")
-            elif risk_score < 60:
-                st.warning("⚠️ **Medium Risk** - Moderate repayment probability. Consider additional verification.")
-            else:
-                st.error("❌ **High Risk** - Elevated default probability. Recommend careful review or rejection.")
+            st.subheader("What Looks Good in Your Application")
+            st.write(feedback["good"])
+
+            st.subheader("Where You Could Improve")
+            st.write(feedback["improve"])
+
+            st.subheader("Overall Assessment")
+            st.write(feedback["overall"])
 
         except Exception as e:
             st.error(f"Error: {str(e)}")
@@ -119,20 +110,43 @@ with tab1:
 # ===================== TAB 2: BATCH UPLOAD =====================
 with tab2:
     st.subheader("Upload Batch Applications")
-    st.markdown("**Note:** CSV/Excel can include all standard fields. `loan_grade` will be ignored if present.")
+
+    st.markdown(
+        """
+        #### Required File Format
+
+        Your CSV or Excel file must contain the following columns (case-sensitive):
+
+        - `person_age` (integer): Age in years (≥ 18).
+        - `person_income` (float): Annual gross income in USD.
+        - `person_emp_length` (integer): Years in current employment.
+        - `loan_amnt` (float): Requested loan amount in USD.
+        - `loan_int_rate` (float): Nominal interest rate in percent.
+        - `cb_person_cred_hist_length` (integer): Years since first credit line.
+        - `person_home_ownership` (string): One of `RENT`, `OWN`, `MORTGAGE`, `OTHER`.
+        - `loan_intent` (string): One of `PERSONAL`, `EDUCATION`, `MEDICAL`, `VENTURE`, `HOMEIMPROVEMENT`, `DEBTCONSOLIDATION`.
+        - `cb_person_default_on_file` (string): `Y` if there is a prior default, `N` otherwise.
+
+        Additional columns will be ignored (for example, `loan_grade` is not used).
+        """
+    )
+
+    schema_df = processor.get_expected_schema()
+    with st.expander("View Required Columns and Examples"):
+        st.dataframe(schema_df, use_container_width=True)
 
     uploaded_file = st.file_uploader(
         "Upload CSV or Excel file with loan applications",
-        type=['csv', 'xlsx', 'xls'],
-        help="File must contain all required columns"
+        type=["csv", "xlsx", "xls"],
+        help="File must contain all required columns shown above.",
     )
 
     if uploaded_file:
         try:
             df = processor.csv_to_dataframe(uploaded_file)
 
-            # Calculate loan_percent_income if not provided
-            df['loan_percent_income'] = df['loan_amnt'] / df['person_income']
+            # Optional derived feature for interpretation (not used directly by model)
+            df["loan_percent_income"] = df["loan_amnt"] / df["person_income"].replace(0, pd.NA)
 
             st.write(f"📊 Loaded {len(df)} applications")
 
@@ -142,23 +156,54 @@ with tab2:
 
                 st.success("✅ Batch processing complete")
 
-                # Display summary
+                # Summary by risk category
                 col_s1, col_s2, col_s3 = st.columns(3)
+                low = (result_df["risk_category"].astype(str).str.contains("Low")).sum()
+                med = (result_df["risk_category"].astype(str).str.contains("Medium")).sum()
+                high = (result_df["risk_category"].astype(str).str.contains("High")).sum()
+                total = len(result_df)
+
                 with col_s1:
-                    low = (result_df['risk_category'] == 'Low Risk').sum()
-                    st.metric("Low Risk", low, f"{low / len(result_df) * 100:.1f}%")
+                    st.metric("Low Risk", low, f"{low / total * 100:.1f}%")
                 with col_s2:
-                    med = (result_df['risk_category'] == 'Medium Risk').sum()
-                    st.metric("Medium Risk", med, f"{med / len(result_df) * 100:.1f}%")
+                    st.metric("Medium Risk", med, f"{med / total * 100:.1f}%")
                 with col_s3:
-                    high = (result_df['risk_category'] == 'High Risk').sum()
-                    st.metric("High Risk", high, f"{high / len(result_df) * 100:.1f}%")
+                    st.metric("High Risk", high, f"{high / total * 100:.1f}%")
 
                 st.markdown(f"**Decision Threshold Used:** {decision_threshold:.2f}")
 
                 st.markdown("---")
                 st.subheader("Results Table")
-                st.dataframe(result_df.sort_values('risk_score_percent', ascending=False), use_container_width=True)
+                st.dataframe(
+                    result_df.sort_values("risk_score_percent", ascending=False),
+                    use_container_width=True,
+                )
+
+                # Optional: per-row feedback via selection
+                st.markdown("#### View Feedback for a Single Application")
+                row_index = st.number_input(
+                    "Enter row number (0-based index) to inspect:",
+                    min_value=0,
+                    max_value=len(result_df) - 1,
+                    value=0,
+                    step=1,
+                )
+                row = df.iloc[int(row_index)]
+                row_prob = result_df["default_probability"].iloc[int(row_index)]
+                feedback = processor.generate_application_feedback(row, row_prob)
+
+                st.markdown(f"**Application #{int(row_index)} Feedback**")
+                st.write(f"- Default probability: {row_prob:.1%}")
+                st.write(f"- Risk score: {result_df['risk_score_percent'].iloc[int(row_index)]:.1f}%")
+
+                st.markdown("**What looks good:**")
+                st.write(feedback["good"])
+
+                st.markdown("**What needs improvement:**")
+                st.write(feedback["improve"])
+
+                st.markdown("**Overall assessment:**")
+                st.write(feedback["overall"])
 
                 # Download
                 csv = result_df.to_csv(index=False)
@@ -166,7 +211,7 @@ with tab2:
                     label="⬇️ Download Results as CSV",
                     data=csv,
                     file_name="credit_risk_results.csv",
-                    mime="text/csv"
+                    mime="text/csv",
                 )
 
         except Exception as e:

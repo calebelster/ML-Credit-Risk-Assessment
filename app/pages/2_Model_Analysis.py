@@ -4,8 +4,9 @@ import plotly.graph_objects as go
 from pathlib import Path
 import sys
 import numpy as np
-from sklearn.metrics import roc_curve, auc
+from sklearn.metrics import roc_auc_score, average_precision_score, brier_score_loss, f1_score
 
+# Add app directory to path (absolute import)
 app_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(app_dir))
 
@@ -14,141 +15,191 @@ from utils.visualizations import ModelVisualizations
 st.set_page_config(page_title="Model Analysis", layout="wide")
 
 st.title("📊 Model Analysis & Performance")
-st.markdown("**Explore model metrics, cross-validation stability, and feature importance**")
+st.markdown("**Explore model metrics, cross-validation stability, and test performance for all models.**")
 
 OUTPUT_DIR = Path(__file__).parent.parent.parent / "output"
 
 
-# Load data
+# ------------------------------
+# Data loading helpers
+# ------------------------------
 @st.cache_data
-def load_metrics():
+def load_cv_metrics():
+    """
+    Load CV metrics for base and ensemble models.
+    """
     metrics_files = {
+        'Random Forest': 'random_forest_cv_metrics.csv',
+        'Gradient Boost': 'grad_boost_cv_metrics.csv',
+        'Logistic Regression': 'log_reg_cv_metrics.csv',
+        'Neural Net': 'neural_net_cv_metrics.csv',
+        'Ensemble Bagging': 'ensemble_bagging_cv_metrics.csv',
+        'Ensemble Voting': 'ensemble_voting_cv_metrics.csv',
         'Ensemble Stacking': 'ensemble_stacking_cv_metrics.csv',
+        'Ensemble Blending': 'ensemble_blending_cv_metrics.csv',
     }
 
     metrics = {}
     for name, file in metrics_files.items():
         path = OUTPUT_DIR / file
         if path.exists():
-            metrics[name] = pd.read_csv(path)
-
+            df = pd.read_csv(path)
+            metrics[name] = df
     return metrics
 
 
 @st.cache_data
-def load_main_results():
-    stacking_preds = OUTPUT_DIR / "ensemble_stacking_preds.csv"
-
+def load_test_results():
+    """
+    Load test-set prediction CSVs.
+    """
     results = {}
-    if stacking_preds.exists():
-        results['Ensemble Stacking'] = pd.read_csv(stacking_preds)
+    stacking_path = OUTPUT_DIR / "ensemble_stacking_preds.csv"
+    rf_path = OUTPUT_DIR / "random_forest_preds.csv"
+    bag_path = OUTPUT_DIR / "ensemble_bagging_preds.csv"
+    vote_path = OUTPUT_DIR / "ensemble_voting_preds.csv"
+    blend_path = OUTPUT_DIR / "ensemble_blending_preds.csv"
+
+    if stacking_path.exists():
+        results["Ensemble Stacking"] = pd.read_csv(stacking_path)
+    if rf_path.exists():
+        results["Random Forest"] = pd.read_csv(rf_path)
+    if bag_path.exists():
+        results["Ensemble Bagging"] = pd.read_csv(bag_path)
+    if vote_path.exists():
+        results["Ensemble Voting"] = pd.read_csv(vote_path)
+    if blend_path.exists():
+        results["Ensemble Blending"] = pd.read_csv(blend_path)
 
     return results
 
 
-try:
-    cv_metrics = load_metrics()
-    test_results = load_main_results()
+cv_metrics = load_cv_metrics()
+test_results = load_test_results()
 
-    # Tab layout
-    tab1, tab2, tab3 = st.tabs(["Cross-Validation", "Test Performance", "Comparison"])
+# ------------------------------
+# Tabs
+# ------------------------------
+tab1, tab2, tab3 = st.tabs(["Cross-Validation", "Test Performance", "Comparison"])
 
-    # ===================== TAB 1: CV STABILITY =====================
-    with tab1:
-        st.subheader("K-Fold Cross-Validation Metrics (Ensemble Stacking)")
-        st.markdown("Shows model stability across 5 folds. Consistent performance = robust model.")
 
-        if cv_metrics:
-            cv_df = cv_metrics['Ensemble Stacking']
+# ===================== TAB 1: CV STABILITY =====================
+with tab1:
+    st.subheader("K-Fold Cross-Validation Metrics")
+    st.markdown("Select a model to inspect how its metrics vary across folds.")
 
-            # Plot CV stability
-            fig = ModelVisualizations.plot_cv_stability(cv_df)
-            st.plotly_chart(fig, use_container_width=True)
+    if not cv_metrics:
+        st.warning("No CV metrics found. Run src/analysis/cross_validation.py first.")
+    else:
+        # Default to Ensemble Stacking if available
+        model_names = list(cv_metrics.keys())
+        default_index = model_names.index("Ensemble Stacking") if "Ensemble Stacking" in model_names else 0
 
-            # Statistics
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("Mean AUC", f"{cv_df['AUC'].mean():.3f}", f"±{cv_df['AUC'].std():.3f}")
-            with col2:
-                st.metric("Mean PR-AUC", f"{cv_df['PR_AUC'].mean():.3f}", f"±{cv_df['PR_AUC'].std():.3f}")
-            with col3:
-                st.metric("Mean Brier", f"{cv_df['Brier'].mean():.3f}", f"±{cv_df['Brier'].std():.3f}")
+        selected_model = st.selectbox("Select Model", model_names, index=default_index)
+        cv_df = cv_metrics[selected_model]
 
-            st.dataframe(cv_df, use_container_width=True)
-        else:
-            st.warning("No CV metrics found. Run ensemble_methods.py first.")
+        # Plot CV stability
+        fig = ModelVisualizations.plot_cv_stability(cv_df)
+        st.plotly_chart(fig, use_container_width=True)
 
-    # ===================== TAB 2: TEST PERFORMANCE =====================
-    with tab2:
-        st.subheader("Test Set Performance (Ensemble Stacking)")
+        # Summary stats
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Mean AUC", f"{cv_df['AUC'].mean():.3f}", f"±{cv_df['AUC'].std():.3f}")
+        with col2:
+            st.metric("Mean PR-AUC", f"{cv_df['PR_AUC'].mean():.3f}", f"±{cv_df['PR_AUC'].std():.3f}")
+        with col3:
+            st.metric("Mean Brier", f"{cv_df['Brier'].mean():.3f}", f"±{cv_df['Brier'].std():.3f}")
 
-        if test_results:
-            test_df = test_results['Ensemble Stacking']
-            y_true = test_df['y_true'].values
-            y_proba = test_df['y_pred_prob'].values
-            y_pred = test_df['y_pred'].values
+        st.markdown("#### Per-Fold Metrics")
+        st.dataframe(cv_df, use_container_width=True)
 
-            from sklearn.metrics import confusion_matrix, roc_auc_score, average_precision_score, brier_score_loss, \
-                f1_score
 
-            cm = confusion_matrix(y_true, y_pred)
-            fig_cm = ModelVisualizations.plot_confusion_matrix(y_true, y_pred, "Ensemble Stacking")
-            st.plotly_chart(fig_cm, use_container_width=True)
+# ===================== TAB 2: TEST PERFORMANCE =====================
+with tab2:
+    st.subheader("Test Set Performance")
 
-            # Metrics
-            col1, col2, col3, col4 = st.columns(4)
-            with col1:
-                st.metric("AUC-ROC", f"{roc_auc_score(y_true, y_proba):.3f}")
-            with col2:
-                st.metric("PR-AUC", f"{average_precision_score(y_true, y_proba):.3f}")
-            with col3:
-                st.metric("F1-Score", f"{f1_score(y_true, y_pred):.3f}")
-            with col4:
-                st.metric("Brier Score", f"{brier_score_loss(y_true, y_proba):.3f}")
-        else:
-            st.warning("No test results found.")
+    if not test_results:
+        st.warning("No test prediction files found. Run src/analysis/ensemble_methods.py first.")
+    else:
+        # Default to Ensemble Stacking if available
+        test_model_names = list(test_results.keys())
+        default_index_test = test_model_names.index("Ensemble Stacking") if "Ensemble Stacking" in test_model_names else 0
 
-    # ===================== TAB 3: COMPARISON =====================
-    with tab3:
-        st.subheader("Model Comparison")
+        selected_test_model = st.selectbox("Select Model", test_model_names, index=default_index_test, key="model_select_test")
+        test_df = test_results[selected_test_model]
 
-        comparison_data = {
-            'Model': ['Random Forest', 'Ensemble Stacking'],
-            'AUC': [0.928, 0.928],
-            'PR-AUC': [0.868, 0.871],
-            'F1-Score': [0.788, 0.794],
-            'LogLoss': [0.252, 0.231],
-        }
+        y_true = test_df["y_true"].values
+        y_proba = test_df["y_pred_prob"].values
+        y_pred = test_df["y_pred"].values
 
-        comp_df = pd.DataFrame(comparison_data)
+        from sklearn.metrics import confusion_matrix
 
-        fig_comp = ModelVisualizations.plot_metrics_comparison(comp_df)
-        st.plotly_chart(fig_comp, use_container_width=True)
+        cm = confusion_matrix(y_true, y_pred)
+        fig_cm = ModelVisualizations.plot_confusion_matrix(y_true, y_pred, selected_test_model)
+        st.plotly_chart(fig_cm, use_container_width=True)
 
-        st.markdown("---")
-        st.markdown("""
+        # Metrics
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("AUC-ROC", f"{roc_auc_score(y_true, y_proba):.3f}")
+        with col2:
+            st.metric("PR-AUC", f"{average_precision_score(y_true, y_proba):.3f}")
+        with col3:
+            st.metric("F1-Score", f"{f1_score(y_true, y_pred):.3f}")
+        with col4:
+            st.metric("Brier Score", f"{brier_score_loss(y_true, y_proba):.3f}")
+
+
+# ===================== TAB 3: COMPARISON =====================
+with tab3:
+    st.subheader("Model Comparison (Test Set)")
+
+    # Use the latest metrics you reported (after removing loan_grade)
+    comparison_data = {
+        "Model": [
+            "Random Forest",
+            "Gradient Boost",
+            "Logistic Regression",
+            "Neural Net",
+            "Ensemble Bagging",
+            "Ensemble Voting",
+            "Ensemble Stacking",
+            "Ensemble Blending",
+        ],
+        "AUC": [0.928, 0.921, 0.856, 0.795, 0.923, 0.923, 0.928, 0.922],
+        "PR-AUC": [0.868, 0.860, 0.686, 0.582, 0.863, 0.863, 0.871, 0.865],
+        "F1-Score": [0.7875, 0.7725, 0.6001, 0.0, 0.7668, 0.7670, 0.7937, 0.7956],
+        "LogLoss": [0.252, 0.247, 0.466, 0.446, 0.255, 0.255, 0.231, 0.355],
+    }
+
+    comp_df = pd.DataFrame(comparison_data)
+
+    fig_comp = ModelVisualizations.plot_metrics_comparison(comp_df)
+    st.plotly_chart(fig_comp, use_container_width=True)
+
+    st.markdown("---")
+    st.markdown(
+        """
         ### Model Selection Rationale
 
-        **Ensemble Stacking** is the primary model (after removing loan_grade):
-        - ✅ **Tied for highest AUC** (0.928) - best discrimination
-        - ✅ **Best calibration** - lowest LogLoss (0.231)
-        - ✅ **Consistent CV performance** - stable across all 5 folds
-        - ✅ **Best F1-Score** (0.794) - balanced precision/recall
-        - ✅ **Combines strengths** of multiple base learners (RF, GB, LR, NN)
+        **Ensemble Stacking** is the primary model (after removing `loan_grade`):
+        - ✅ Tied for highest **AUC** (0.928) – excellent discrimination between defaults and non-defaults.
+        - ✅ Best **calibration** – lowest LogLoss (0.231), meaning probabilities are well aligned with actual outcomes.
+        - ✅ Highest **F1-Score** among robust models (≈0.794) – strong balance of precision and recall.
+        - ✅ Consistent **CV performance** – stable metrics across folds, indicating robustness.
+        - ✅ Combines strengths of Random Forest, Gradient Boost, Logistic Regression, and Neural Net.
 
-        ### Key Performance Metrics
-        - **Precision:** 93.4% - Only 6.6% of approved loans predicted to default actually don't
-        - **Recall:** 68.9% - Catches ~69% of actual defaults
-        - **Decision Threshold:** Adjustable in Risk Calculator (0.30-0.70)
-          - Lower threshold (0.30-0.40): More conservative, catches more defaults
-          - Higher threshold (0.60-0.70): More lenient, approves more loans
+        **Random Forest** remains an excellent benchmark / fallback:
+        - ✅ Same AUC (0.928) but slightly worse calibration (LogLoss 0.252).
+        - ✅ More interpretable and faster to score.
+        - ✅ Useful for feature importance and business explanations.
 
-        ### Why We Removed loan_grade
-        - Users don't know their loan grade before applying
-        - It's a derived feature from internal scoring, not user-provided input
-        - Removing it made predictions more practical and reduced potential leakage
-        - Model performance remained strong (AUC 0.928 vs previous 0.931)
-        """)
+        Removing `loan_grade`:
+        - Users don’t know their loan grade ahead of time; it is an internal lender feature.
+        - Removing it avoids potential leakage and makes the tool realistic for applicants.
+        - Performance remained strong after removal (Stacking AUC only dropped slightly to 0.928).
 
-except Exception as e:
-    st.error(f"Error loading data: {str(e)}")
+        You can use the **Risk Calculator** page to adjust the decision threshold and see how approval risk changes in real time.
+        """
+    )
