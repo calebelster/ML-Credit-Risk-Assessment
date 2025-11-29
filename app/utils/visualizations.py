@@ -107,24 +107,37 @@ class ModelVisualizations:
     @staticmethod
     def plot_cv_stability(cv_metrics_df):
         """Plot CV metrics across folds to show stability"""
-        metrics = ['AUC', 'PR-AUC', 'Brier', 'KS']
+        metrics = ["AUC", "PR-AUC", "Brier", "KS"]
 
         fig = go.Figure()
 
+        # x values are fold numbers starting at 1
+        x_vals = np.arange(1, len(cv_metrics_df) + 1)
+
         for metric in metrics:
             if metric in cv_metrics_df.columns:
-                fig.add_trace(go.Scatter(
-                    x=cv_metrics_df.index + 1,
-                    y=cv_metrics_df[metric],
-                    mode='lines+markers',
-                    name=metric
-                ))
+                fig.add_trace(
+                    go.Scatter(
+                        x=x_vals,
+                        y=cv_metrics_df[metric],
+                        mode="lines+markers",
+                        name=metric,
+                    )
+                )
 
         fig.update_layout(
-            title='CV Metrics Across Folds (Stacking Model)',
-            xaxis_title='Fold',
-            yaxis_title='Metric Value',
+            title="CV Metrics Across Folds",
+            xaxis_title="Fold",
+            yaxis_title="Metric Value",
             height=500,
-            hovermode='x unified'
+            hovermode="x unified",
         )
+
+        # Ensure x-axis shows only integer fold numbers
+        fig.update_xaxes(
+            tickmode="array",
+            tickvals=x_vals,
+            ticktext=[str(i) for i in x_vals],
+        )
+
         return fig
