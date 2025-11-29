@@ -1,5 +1,7 @@
 # ML Credit Risk Assessment
 
+Website: [Credit Risk Assessment Platform](https://ml-credit-risk-assessment-e6owtb8xlwbjtjjnccc57a.streamlit.app/)
+
 Credit risk assessment project that trains multiple machine learning models (including a Stacking ensemble) on a public credit risk dataset and exposes them through a Streamlit web app for:
 
 - Single application risk scoring
