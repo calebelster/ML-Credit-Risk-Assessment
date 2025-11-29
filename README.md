@@ -198,7 +198,7 @@ From the project root:
 2. Run Streamlit:
 ```bash
 cd app
-streamlit run app.py
+streamlit run Home.py
 ```
 
 Open the URL shown in the terminal (typically `http://localhost:8501`).
