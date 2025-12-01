@@ -114,7 +114,7 @@ class CreditRiskPredictor:
 
         # Override category if below threshold (approval)
         risk_category = pd.Series(
-            ['Approved ✅' if pred == 0 else risk_cat
+            [risk_cat
              for pred, risk_cat in zip(risk_preds, risk_category)],
             index=X.index
         )
