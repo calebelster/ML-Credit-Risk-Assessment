@@ -4,7 +4,7 @@ import plotly.graph_objects as go
 from pathlib import Path
 import sys
 import numpy as np
-from sklearn.metrics import roc_auc_score, average_precision_score, brier_score_loss, f1_score
+from sklearn.metrics import roc_auc_score, average_precision_score, brier_score_loss, f1_score, confusion_matrix, accuracy_score, precision_score, recall_score
 
 # Add app directory to path (absolute import)
 app_dir = Path(__file__).parent.parent
@@ -124,22 +124,32 @@ with tab2:
     else:
         # Default to Ensemble Stacking if available
         test_model_names = list(test_results.keys())
-        default_index_test = test_model_names.index("Ensemble Stacking") if "Ensemble Stacking" in test_model_names else 0
+        default_index_test = (
+            test_model_names.index("Ensemble Stacking")
+            if "Ensemble Stacking" in test_model_names
+            else 0
+        )
 
-        selected_test_model = st.selectbox("Select Model", test_model_names, index=default_index_test, key="model_select_test")
+        selected_test_model = st.selectbox(
+            "Select Model",
+            test_model_names,
+            index=default_index_test,
+            key="model_select_test",
+        )
         test_df = test_results[selected_test_model]
 
         y_true = test_df["y_true"].values
         y_proba = test_df["y_pred_prob"].values
         y_pred = test_df["y_pred"].values
 
-        from sklearn.metrics import confusion_matrix
-
+        # Confusion matrix + plot
         cm = confusion_matrix(y_true, y_pred)
-        fig_cm = ModelVisualizations.plot_confusion_matrix(y_true, y_pred, selected_test_model)
+        fig_cm = ModelVisualizations.plot_confusion_matrix(
+            y_true, y_pred, selected_test_model
+        )
         st.plotly_chart(fig_cm, use_container_width=True)
 
-        # Metrics
+        # Global metrics (same as before)
         col1, col2, col3, col4 = st.columns(4)
         with col1:
             st.metric("AUC-ROC", f"{roc_auc_score(y_true, y_proba):.3f}")
@@ -149,6 +159,15 @@ with tab2:
             st.metric("F1-Score", f"{f1_score(y_true, y_pred):.3f}")
         with col4:
             st.metric("Brier Score", f"{brier_score_loss(y_true, y_proba):.3f}")
+
+        # NEW: Accuracy, Precision, Recall
+        col5, col6, col7 = st.columns(3)
+        with col5:
+            st.metric("Accuracy", f"{accuracy_score(y_true, y_pred):.3f}")
+        with col6:
+            st.metric("Precision", f"{precision_score(y_true, y_pred):.3f}")
+        with col7:
+            st.metric("Recall", f"{recall_score(y_true, y_pred):.3f}")
 
 
 # ===================== TAB 3: COMPARISON =====================
