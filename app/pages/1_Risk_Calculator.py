@@ -86,7 +86,7 @@ with tab1:
             with col_res1:
                 st.metric("Risk Score (Probability of Default)", f"{risk_score:.1f}%")
             with col_res2:
-                st.metric("Risk Category", risk_category)
+                st.metric("Risk Category")
                 with col_res2:
                     if risk_category == "Low Risk":
                         bg = "#d4edda"   # light green
