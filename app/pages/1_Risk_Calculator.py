@@ -215,8 +215,7 @@ with tab2:
                 feedback = processor.generate_application_feedback(row, row_prob)
 
                 st.markdown(f"**Application #{int(row_index)} Feedback**")
-                st.write(f"- Default probability: {row_prob:.1%}")
-                st.write(f"- Risk score: {result_df['risk_score_percent'].iloc[int(row_index)]:.1f}%")
+                st.write(f"- Risk Score (Probability of Default): {row_prob:.1%}")
 
                 st.markdown("**What looks good:**")
                 st.write(feedback["good"])

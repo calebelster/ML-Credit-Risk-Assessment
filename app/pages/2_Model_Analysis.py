@@ -184,16 +184,16 @@ with tab3:
         ### Model Selection Rationale
 
         **Ensemble Stacking** is the primary model (after removing `loan_grade`):
-        - ✅ Tied for highest **AUC** (0.928) – excellent discrimination between defaults and non-defaults.
-        - ✅ Best **calibration** – lowest LogLoss (0.231), meaning probabilities are well aligned with actual outcomes.
-        - ✅ Highest **F1-Score** among robust models (≈0.794) – strong balance of precision and recall.
-        - ✅ Consistent **CV performance** – stable metrics across folds, indicating robustness.
-        - ✅ Combines strengths of Random Forest, Gradient Boost, Logistic Regression, and Neural Net.
+        - Tied for highest **AUC** (0.928) – excellent discrimination between defaults and non-defaults.
+        - Best **calibration** – lowest LogLoss (0.231), meaning probabilities are well aligned with actual outcomes.
+        - Highest **F1-Score** among robust models (≈0.794) – strong balance of precision and recall.
+        - Consistent **CV performance** – stable metrics across folds, indicating robustness.
+        - Combines strengths of Random Forest, Gradient Boost, and Logistic Regression.
 
         **Random Forest** remains an excellent benchmark / fallback:
-        - ✅ Same AUC (0.928) but slightly worse calibration (LogLoss 0.252).
-        - ✅ More interpretable and faster to score.
-        - ✅ Useful for feature importance and business explanations.
+        - Same AUC (0.928) but slightly worse calibration (LogLoss 0.252).
+        - More interpretable and faster to score.
+        - Useful for feature importance and business explanations.
 
         Removing `loan_grade`:
         - Users don’t know their loan grade ahead of time; it is an internal lender feature.
