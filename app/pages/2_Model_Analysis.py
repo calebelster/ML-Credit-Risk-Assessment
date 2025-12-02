@@ -174,28 +174,43 @@ with tab2:
 with tab3:
     st.subheader("Model Comparison (Test Set)")
 
-    # Use the latest metrics you reported (after removing loan_grade)
-    comparison_data = {
-        "Model": [
-            "Random Forest",
-            "Gradient Boost",
-            "Logistic Regression",
-            "Neural Net",
-            "Ensemble Bagging",
-            "Ensemble Voting",
-            "Ensemble Stacking",
-            "Ensemble Blending",
-        ],
-        "AUC": [0.928, 0.921, 0.856, 0.795, 0.923, 0.923, 0.928, 0.922],
-        "PR-AUC": [0.868, 0.860, 0.686, 0.582, 0.863, 0.863, 0.871, 0.865],
-        "F1-Score": [0.7875, 0.7725, 0.6001, 0.0, 0.7668, 0.7670, 0.7937, 0.7956],
-        "LogLoss": [0.252, 0.247, 0.466, 0.446, 0.255, 0.255, 0.231, 0.355],
-    }
+    if not test_results:
+        st.warning("No test prediction files found. Run src/analysis/ensemble_methods.py first.")
+    else:
+        rows = []
 
-    comp_df = pd.DataFrame(comparison_data)
+        # test_results: dict[model_name -> DataFrame with y_true, y_pred, y_pred_prob]
+        for model_name, df in test_results.items():
+            y_true = df["y_true"].values
+            y_pred = df["y_pred"].values
+            y_proba = df["y_pred_prob"].values
 
-    fig_comp = ModelVisualizations.plot_metrics_comparison(comp_df)
-    st.plotly_chart(fig_comp, use_container_width=True)
+            row = {
+                "Model": model_name,
+                "AUC": roc_auc_score(y_true, y_proba),
+                "PR-AUC": average_precision_score(y_true, y_proba),
+                "F1-Score": f1_score(y_true, y_pred),
+                "LogLoss": brier_score_loss(y_true, y_proba),  # or log_loss if you prefer
+                "Accuracy": accuracy_score(y_true, y_pred),
+                "Precision": precision_score(y_true, y_pred, zero_division=0),
+                "Recall": recall_score(y_true, y_pred, zero_division=0),
+            }
+            rows.append(row)
+
+        comp_df = pd.DataFrame(rows)
+
+        # First graph: your existing comparison across AUC, PR-AUC, F1, LogLoss
+        fig_comp = ModelVisualizations.plot_metrics_comparison(
+            comp_df[["Model", "AUC", "PR-AUC", "F1-Score", "LogLoss"]]
+        )
+        st.plotly_chart(fig_comp, use_container_width=True)
+
+        st.markdown("---")
+
+        # Second graph: Accuracy / Precision / Recall comparison for all models
+        apr_df = comp_df[["Model", "Accuracy", "Precision", "Recall"]]
+        fig_apr = ModelVisualizations.plot_metrics_comparison(apr_df)
+        st.plotly_chart(fig_apr, use_container_width=True)
 
     st.markdown("---")
     st.markdown(
