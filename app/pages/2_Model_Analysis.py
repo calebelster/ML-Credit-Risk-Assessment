@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
+import plotly.express as px
 from pathlib import Path
 import sys
 import numpy as np
@@ -178,28 +179,27 @@ with tab3:
         st.warning("No test prediction files found. Run src/analysis/ensemble_methods.py first.")
     else:
         rows = []
-
-        # test_results: dict[model_name -> DataFrame with y_true, y_pred, y_pred_prob]
         for model_name, df in test_results.items():
             y_true = df["y_true"].values
             y_pred = df["y_pred"].values
             y_proba = df["y_pred_prob"].values
 
-            row = {
-                "Model": model_name,
-                "AUC": roc_auc_score(y_true, y_proba),
-                "PR-AUC": average_precision_score(y_true, y_proba),
-                "F1-Score": f1_score(y_true, y_pred),
-                "LogLoss": brier_score_loss(y_true, y_proba),  # or log_loss if you prefer
-                "Accuracy": accuracy_score(y_true, y_pred),
-                "Precision": precision_score(y_true, y_pred, zero_division=0),
-                "Recall": recall_score(y_true, y_pred, zero_division=0),
-            }
-            rows.append(row)
+            rows.append(
+                {
+                    "Model": model_name,
+                    "AUC": roc_auc_score(y_true, y_proba),
+                    "PR-AUC": average_precision_score(y_true, y_proba),
+                    "F1-Score": f1_score(y_true, y_pred),
+                    "LogLoss": brier_score_loss(y_true, y_proba),
+                    "Accuracy": accuracy_score(y_true, y_pred),
+                    "Precision": precision_score(y_true, y_pred, zero_division=0),
+                    "Recall": recall_score(y_true, y_pred, zero_division=0),
+                }
+            )
 
         comp_df = pd.DataFrame(rows)
 
-        # First graph: your existing comparison across AUC, PR-AUC, F1, LogLoss
+        # First chart: reuse your existing helper
         fig_comp = ModelVisualizations.plot_metrics_comparison(
             comp_df[["Model", "AUC", "PR-AUC", "F1-Score", "LogLoss"]]
         )
@@ -207,10 +207,26 @@ with tab3:
 
         st.markdown("---")
 
-        # Second graph: Accuracy / Precision / Recall comparison for all models
+        # Second chart: build APR comparison directly with Plotly
         apr_df = comp_df[["Model", "Accuracy", "Precision", "Recall"]]
-        fig_apr = ModelVisualizations.plot_metrics_comparison(apr_df)
+
+        # Melt to long form: columns -> Metric, value -> Score
+        apr_long = apr_df.melt(
+            id_vars="Model",
+            var_name="Metric",
+            value_name="Score",
+        )
+
+        fig_apr = px.bar(
+            apr_long,
+            x="Model",
+            y="Score",
+            color="Metric",
+            barmode="group",
+            title="Accuracy, Precision, Recall by Model",
+        )
         st.plotly_chart(fig_apr, use_container_width=True)
+
 
     st.markdown("---")
     st.markdown(
