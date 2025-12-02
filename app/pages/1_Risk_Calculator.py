@@ -86,32 +86,29 @@ with tab1:
             with col_res1:
                 st.metric("Risk Score (Probability of Default)", f"{risk_score:.1f}%")
             with col_res2:
-                st.metric("Risk Category")
-                with col_res2:
-                    if risk_category == "Low Risk":
-                        bg = "#d4edda"   # light green
-                        fg = "#155724"
-                    elif risk_category == "Medium Risk":
-                        bg = "#fff3cd"   # light yellow
-                        fg = "#856404"
-                    else:
-                        bg = "#f8d7da"   # light red
-                        fg = "#721c24"
+                if risk_category == "Low Risk":
+                    bg = "#d4edda"   # light green
+                    fg = "#155724"
+                elif risk_category == "Medium Risk":
+                    bg = "#fff3cd"   # light yellow
+                    fg = "#856404"
+                else:
+                    bg = "#f8d7da"   # light red
+                    fg = "#721c24"
 
-                    html = f"""
-                    <div style="
-                        display:inline-block;
-                        padding:0.35rem 0.75rem;
-                        border-radius:0.5rem;
-                        background-color:{bg};
-                        color:{fg};
-                        font-weight:600;
-                    ">
-                        {risk_category}
-                    </div>
-                    """
-
-                    st.markdown(html, unsafe_allow_html=True)
+                html = f"""
+                <div style="
+                    display:inline-block;
+                    padding:0.35rem 0.75rem;
+                    border-radius:0.5rem;
+                    background-color:{bg};
+                    color:{fg};
+                    font-weight:600;
+                ">
+                    {risk_category}
+                </div>
+                """
+                st.markdown(html, unsafe_allow_html=True)
 
             st.markdown(f"**Decision Threshold Used:** {decision_threshold:.2f}")
 
