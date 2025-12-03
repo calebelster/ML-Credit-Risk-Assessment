@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
 from pathlib import Path
+import shap
+import matplotlib.pyplot as plt
 import sys
 
 # Add app directory to path
@@ -114,14 +116,29 @@ with tab1:
             st.markdown(f"**Decision Threshold Used:** {decision_threshold:.2f}")
 
             # Tailored feedback
-            feedback = processor.generate_application_feedback(df.iloc[0], default_prob)
+            shap_contribs_list = processor.compute_shap_values(predictor.model, df, predictor.feature_names)
+
+            feedback = processor.generate_application_feedback(
+                df.iloc[0],
+                default_prob,
+                feature_contribs=shap_contribs_list[0]
+            )
+
+            # Optional: SHAP bar plot
+            st.subheader("Feature Contributions to Risk")
+            X_enc = processor.preprocess_for_prediction(df, predictor.feature_names)
+            explainer = shap.TreeExplainer(predictor.model)
+            shap_values = explainer(X_enc)
+            shap.plots.bar(shap_values[0], max_display=10, show=False)
+            plt.tight_layout()
+            st.pyplot(plt.gcf())
 
             st.markdown("---")
-            st.markdown("**What Looks Good in Your Application**")
+            st.subheader("**What Looks Good in Your Application**")
             for item in feedback["good"]:
                 st.markdown(f"- {item}")
 
-            st.markdown("**What needs improvement:**")
+            st.subheader("**What needs improvement:**")
             for item in feedback["improve"]:
                 st.markdown(f"- {item}")
 
