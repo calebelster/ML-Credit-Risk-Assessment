@@ -116,34 +116,34 @@ with tab1:
             st.markdown(f"**Decision Threshold Used:** {decision_threshold:.2f}")
 
             X_enc = processor.preprocess_for_prediction(df, predictor.feature_names)
-            X_imp = pd.DataFrame(
-                predictor.feature_imputer.transform(X_enc),
-                columns=X_enc.columns,
-                index=X_enc.index
-            )
 
-            # SHAP TreeExplainer for RF base model
-            explainer = shap.TreeExplainer(predictor.base_models["rf"])
-            shap_exp = explainer(X_imp)  # returns a single Explanation object
+            # Use the Random Forest base model for SHAP explanations
+            rf_model = predictor.base_models["rf"]
+            explainer = shap.TreeExplainer(rf_model)
+            shap_values = explainer.shap_values(X_enc)  # returns list for RF classification
 
-            # Generate feature contributions dict for feedback
-            shap_contribs_list = []
-            for i in range(len(df)):
-                shap_contribs_list.append(dict(zip(X_imp.columns, shap_exp.values[i])))
+            # For binary classification, shap_values[1] corresponds to the positive class
+            shap_vals_for_row = shap_values[1][0]  # first row/sample
+            feature_contribs = dict(zip(X_enc.columns, shap_vals_for_row))
 
             # Generate feedback including SHAP contributions
             feedback = processor.generate_application_feedback(
                 df.iloc[0],
                 default_prob,
-                feature_contribs=shap_contribs_list[0]
+                feature_contribs=feature_contribs
             )
-
-            # Plot SHAP summary bar
+            
             st.subheader("Feature Contributions to Risk")
-            shap.plots.bar(shap_exp, max_display=10, show=False)
+            plt.figure(figsize=(8, 5))
+            shap.plots.bar(shap.Explanation(
+                values=shap_vals_for_row,
+                base_values=explainer.expected_value[1],
+                data=X_enc.iloc[0],
+                feature_names=X_enc.columns
+            ), max_display=10, show=False)
             plt.tight_layout()
             st.pyplot(plt.gcf())
-            plt.clf()
+            plt.close()
 
             st.markdown("---")
             st.subheader("**What Looks Good in Your Application**")
@@ -156,6 +156,8 @@ with tab1:
 
             st.subheader("Overall Assessment")
             st.write(feedback["overall"])
+
+
 
         except Exception as e:
             st.error(f"Error: {str(e)}")
