@@ -87,7 +87,7 @@ with tab1:
                 st.metric("Risk Score (Probability of Default)", f"{risk_score:.1f}%")
             with col_res2:
                 st.write("Risk Category")
-                if risk_category == "Low Risk":
+                if risk_category == "Approved":
                     bg = "#d4edda"   # light green
                     fg = "#155724"
                 elif risk_category == "Medium Risk":
