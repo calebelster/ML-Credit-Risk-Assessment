@@ -25,7 +25,7 @@ st.title("💳 Credit Risk Assessment")
 st.markdown("**Assess loan default risk for individual or batch applications**")
 
 # ============================================================
-#                     🔥 CACHED LOADERS
+#                     CACHED LOADERS
 # ============================================================
 
 @st.cache_resource
@@ -37,9 +37,9 @@ def load_processor():
     return DataProcessor()
 
 @st.cache_data
-def load_file_dataframe(processor, uploaded_file):
+def load_file_dataframe(_processor, uploaded_file):
     """Cache CSV/XLSX to avoid reloading when widgets update."""
-    return processor.csv_to_dataframe(uploaded_file)
+    return _processor.csv_to_dataframe(uploaded_file)
 
 # Initialize cached resources
 predictor = load_predictor()
