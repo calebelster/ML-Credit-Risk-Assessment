@@ -146,118 +146,115 @@ class DataProcessor:
 
         return X_enc
 
-    from typing import Dict, List, Optional
-import pandas as pd
+    def generate_application_feedback(
+            row: pd.Series,
+            default_prob: float,
+            feature_contribs: Optional[Dict[str, float]] = None
+        ) -> Dict[str, object]:
+            """
+            Generate feedback with bullet lists:
+            - 'positives': List[str] (reassurance / strengths)
+            - 'negatives': List[str] (constructive suggestions)
+            - 'overall': str (short summary)
+            Optionally accepts `feature_contribs` mapping feature_name -> contribution (positive means raises risk).
+            """
 
-def generate_application_feedback(
-    row: pd.Series,
-    default_prob: float,
-    feature_contribs: Optional[Dict[str, float]] = None
-) -> Dict[str, object]:
-    """
-    Generate feedback with bullet lists:
-      - 'positives': List[str] (reassurance / strengths)
-      - 'negatives': List[str] (constructive suggestions)
-      - 'overall': str (short summary)
-    Optionally accepts `feature_contribs` mapping feature_name -> contribution (positive means raises risk).
-    """
+            positives: List[str] = []
+            negatives: List[str] = []
 
-    positives: List[str] = []
-    negatives: List[str] = []
+            # helper to add unique bullets
+            def add_pos(msg: str):
+                if msg not in positives:
+                    positives.append(msg)
 
-    # helper to add unique bullets
-    def add_pos(msg: str):
-        if msg not in positives:
-            positives.append(msg)
+            def add_neg(msg: str):
+                if msg not in negatives:
+                    negatives.append(msg)
 
-    def add_neg(msg: str):
-        if msg not in negatives:
-            negatives.append(msg)
+            # compute loan pct income robustly
+            try:
+                person_income = float(row.get("person_income", 0) or 0)
+            except Exception:
+                person_income = 0.0
+            loan_amnt = float(row.get("loan_amnt", 0) or 0)
+            loan_pct_income = loan_amnt / person_income if person_income > 0 else 1.0
 
-    # compute loan pct income robustly
-    try:
-        person_income = float(row.get("person_income", 0) or 0)
-    except Exception:
-        person_income = 0.0
-    loan_amnt = float(row.get("loan_amnt", 0) or 0)
-    loan_pct_income = loan_amnt / person_income if person_income > 0 else 1.0
-
-    # Credit history
-    hist = row.get("cb_person_cred_hist_length", None)
-    if hist is not None and hist >= 8:
-        add_pos("You have a relatively long credit history — this is a strong positive. Keep maintaining on-time payments.")
-    else:
-        add_neg("Building a longer credit history (keep accounts open, avoid gaps) will help future scores.")
-
-    # Loan vs income
-    if loan_pct_income <= 0.2:
-        add_pos("Your requested loan is modest relative to income — this reduces repayment pressure.")
-    elif loan_pct_income <= 0.4:
-        add_neg("Your loan is a moderate share of income; lowering the amount or increasing income would reduce risk.")
-    else:
-        add_neg("Your loan is a large share of income; consider reducing the request or increasing income/savings.")
-
-    # Interest rate
-    ir = row.get("loan_int_rate", None)
-    if ir is not None:
-        try:
-            ir = float(ir)
-            if ir <= 10:
-                add_pos("Your interest rate is in a reasonable range; keep shopping for better rates periodically.")
+            # Credit history
+            hist = row.get("cb_person_cred_hist_length", None)
+            if hist is not None and hist >= 8:
+                add_pos("You have a relatively long credit history — this is a strong positive. Keep maintaining on-time payments.")
             else:
-                add_neg("A lower interest rate would reduce monthly burden; consider refinancing or negotiating if possible.")
-        except Exception:
-            pass
+                add_neg("Building a longer credit history (keep accounts open, avoid gaps) will help future scores.")
 
-    # Employment length
-    emp = row.get("person_emp_length", None)
-    if emp is not None and emp >= 2:
-        add_pos("Employment tenure suggests stability — maintain steady employment where possible.")
-    else:
-        add_neg("Longer tenure at your job or documenting stable income (contracts/pay stubs) will strengthen applications.")
+            # Loan vs income
+            if loan_pct_income <= 0.2:
+                add_pos("Your requested loan is modest relative to income — this reduces repayment pressure.")
+            elif loan_pct_income <= 0.4:
+                add_neg("Your loan is a moderate share of income; lowering the amount or increasing income would reduce risk.")
+            else:
+                add_neg("Your loan is a large share of income; consider reducing the request or increasing income/savings.")
 
-    # Prior default
-    default_flag = row.get("cb_person_default_on_file", "N")
-    if str(default_flag).upper() == "N":
-        add_pos("No prior default on file — good track record. Continue punctual payments.")
-    else:
-        add_neg("A prior default increases risk; consistently on-time payments over time will improve the score.")
+            # Interest rate
+            ir = row.get("loan_int_rate", None)
+            if ir is not None:
+                try:
+                    ir = float(ir)
+                    if ir <= 10:
+                        add_pos("Your interest rate is in a reasonable range; keep shopping for better rates periodically.")
+                    else:
+                        add_neg("A lower interest rate would reduce monthly burden; consider refinancing or negotiating if possible.")
+                except Exception:
+                    pass
 
-    # Home ownership
-    home = row.get("person_home_ownership", None)
-    if home in ["OWN", "MORTGAGE"]:
-        add_pos("Owning or having a mortgage indicates asset stability — keep building equity and savings.")
-    else:
-        add_neg("Building savings and reducing unsecured debt can improve your profile if you currently rent.")
+            # Employment length
+            emp = row.get("person_emp_length", None)
+            if emp is not None and emp >= 2:
+                add_pos("Employment tenure suggests stability — maintain steady employment where possible.")
+            else:
+                add_neg("Longer tenure at your job or documenting stable income (contracts/pay stubs) will strengthen applications.")
 
-    # Optional: incorporate feature_contribs (e.g. SHAP)
-    if feature_contribs:
-        # We want the top features that *increase* risk and top features that *decrease* risk
-        # feature_contribs: feature -> contribution (positive means increases prob / risk)
-        contrib_items = sorted(feature_contribs.items(), key=lambda kv: kv[1], reverse=True)
-        # positive contributors to risk
-        for feat, val in contrib_items[:3]:
-            if val > 0:
-                add_neg(f"Factor: {feat} is contributing to higher risk (impact ≈ {val:.3f}).")
-        # negative contributors (i.e., protective features)
-        for feat, val in reversed(contrib_items[-3:]):
-            if val < 0:
-                add_pos(f"Factor: {feat} is helping reduce risk (impact ≈ {val:.3f}).")
+            # Prior default
+            default_flag = row.get("cb_person_default_on_file", "N")
+            if str(default_flag).upper() == "N":
+                add_pos("No prior default on file — good track record. Continue punctual payments.")
+            else:
+                add_neg("A prior default increases risk; consistently on-time payments over time will improve the score.")
 
-    # Decide final messaging by risk band
-    if default_prob < 0.3:
-        overall = "Low risk — this application looks favorable."
-        # low risk: reassure, but provide light suggestions to keep improving
-        # move most negatives to "suggestions" (they are already constructive)
-        # ensure positives appear first in UI
-    elif default_prob < 0.6:
-        overall = "Moderate risk — you have strengths and areas to improve."
-    else:
-        overall = "High risk — significant improvements are recommended."
+            # Home ownership
+            home = row.get("person_home_ownership", None)
+            if home in ["OWN", "MORTGAGE"]:
+                add_pos("Owning or having a mortgage indicates asset stability — keep building equity and savings.")
+            else:
+                add_neg("Building savings and reducing unsecured debt can improve your profile if you currently rent.")
 
-    return {
-        "positives": positives or ["No strong positives identified."],
-        "negatives": negatives or ["No critical weaknesses identified."],
-        "overall": overall,
-        "default_prob": float(default_prob)
-    }
+            # Optional: incorporate feature_contribs (e.g. SHAP)
+            if feature_contribs:
+                # We want the top features that *increase* risk and top features that *decrease* risk
+                # feature_contribs: feature -> contribution (positive means increases prob / risk)
+                contrib_items = sorted(feature_contribs.items(), key=lambda kv: kv[1], reverse=True)
+                # positive contributors to risk
+                for feat, val in contrib_items[:3]:
+                    if val > 0:
+                        add_neg(f"Factor: {feat} is contributing to higher risk (impact ≈ {val:.3f}).")
+                # negative contributors (i.e., protective features)
+                for feat, val in reversed(contrib_items[-3:]):
+                    if val < 0:
+                        add_pos(f"Factor: {feat} is helping reduce risk (impact ≈ {val:.3f}).")
+
+            # Decide final messaging by risk band
+            if default_prob < 0.3:
+                overall = "Low risk — this application looks favorable."
+                # low risk: reassure, but provide light suggestions to keep improving
+                # move most negatives to "suggestions" (they are already constructive)
+                # ensure positives appear first in UI
+            elif default_prob < 0.6:
+                overall = "Moderate risk — you have strengths and areas to improve."
+            else:
+                overall = "High risk — significant improvements are recommended."
+
+            return {
+                "positives": positives or ["No strong positives identified."],
+                "negatives": negatives or ["No critical weaknesses identified."],
+                "overall": overall,
+                "default_prob": float(default_prob)
+            }
