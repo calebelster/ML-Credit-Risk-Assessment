@@ -116,22 +116,39 @@ with tab1:
             st.markdown(f"**Decision Threshold Used:** {decision_threshold:.2f}")
 
             # Tailored feedback
-            shap_contribs_list = processor.compute_shap_values(predictor.model, df, predictor.feature_names)
+            shap_contribs_list = processor.compute_shap_values(
+                predictor.base_models["rf"],  # <- use RF base model
+                df,
+                predictor.feature_names
+            )
 
+            # Generate feedback including SHAP contributions
             feedback = processor.generate_application_feedback(
                 df.iloc[0],
                 default_prob,
                 feature_contribs=shap_contribs_list[0]
             )
 
-            # Optional: SHAP bar plot
+            # Optional: SHAP bar plot for the RF model
             st.subheader("Feature Contributions to Risk")
+
+            # Preprocess input exactly as the model expects
             X_enc = processor.preprocess_for_prediction(df, predictor.feature_names)
-            explainer = shap.TreeExplainer(predictor.model)
-            shap_values = explainer(X_enc)
-            shap.plots.bar(shap_values[0], max_display=10, show=False)
+            X_imp = pd.DataFrame(
+                predictor.feature_imputer.transform(X_enc),
+                columns=X_enc.columns,
+                index=X_enc.index
+            )
+
+            # Use SHAP TreeExplainer on RF base model
+            explainer = shap.TreeExplainer(predictor.base_models["rf"])
+            shap_values = explainer.shap_values(X_imp)
+
+            # Plot top 10 features
+            shap.plots.bar(shap_values[1], max_display=10, show=False)  # index 1 = class 1 (default)
             plt.tight_layout()
             st.pyplot(plt.gcf())
+            plt.clf()  # clear the figure for the next plot
 
             st.markdown("---")
             st.subheader("**What Looks Good in Your Application**")
