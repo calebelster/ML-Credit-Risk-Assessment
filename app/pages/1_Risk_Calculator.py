@@ -246,13 +246,13 @@ with tab2:
         if result_df is not None:
             # Summary by risk category
             col_s1, col_s2, col_s3 = st.columns(3)
-            low = (result_df["risk_category"].astype(str).str.contains("Low")).sum()
+            low = (result_df["risk_category"].astype(str).str.contains("Approved ✅")).sum()
             med = (result_df["risk_category"].astype(str).str.contains("Medium")).sum()
             high = (result_df["risk_category"].astype(str).str.contains("High")).sum()
             total = len(result_df)
 
             with col_s1:
-                st.metric("Low Risk", low, f"{low / total * 100:.1f}%")
+                st.metric("Approved", low, f"{low / total * 100:.1f}%")
             with col_s2:
                 st.metric("Medium Risk", med, f"{med / total * 100:.1f}%")
             with col_s3:

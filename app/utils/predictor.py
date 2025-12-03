@@ -70,7 +70,7 @@ class CreditRiskPredictor:
 
         risk_category_raw = pd.cut(
             risk_scores,
-            bins=[0, 10, 20, 100],
+            bins=[0, 10, 25, 100],
             labels=["Low Risk", "Medium Risk", "High Risk"],
         )
 
