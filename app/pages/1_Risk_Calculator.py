@@ -253,9 +253,9 @@ with tab2:
 
             with col_s1:
                 st.metric("Approved", low, f"{low / total * 100:.1f}%")
+            #with col_s2:
+            #    st.metric("Medium Risk", med, f"{med / total * 100:.1f}%")
             with col_s2:
-                st.metric("Medium Risk", med, f"{med / total * 100:.1f}%")
-            with col_s3:
                 st.metric("High Risk", high, f"{high / total * 100:.1f}%")
 
             st.markdown(f"**Decision Threshold Used:** {decision_threshold:.2f}")
