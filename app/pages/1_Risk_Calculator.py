@@ -114,36 +114,7 @@ with tab1:
                 st.markdown(html, unsafe_allow_html=True)
 
             st.markdown(f"**Decision Threshold Used:** {decision_threshold:.2f}")
-
-            X_enc = processor.preprocess_for_prediction(df, predictor.feature_names)
-
-            # Use the Random Forest base model for SHAP explanations
-            rf_model = predictor.base_models["rf"]
-            explainer = shap.TreeExplainer(rf_model)
-            shap_values = explainer.shap_values(X_enc)  # returns list for RF classification
-
-            # For binary classification, shap_values[1] corresponds to the positive class
-            shap_vals_for_row = shap_values[1][0]  # first row/sample
-            feature_contribs = dict(zip(X_enc.columns, shap_vals_for_row))
-
-            # Generate feedback including SHAP contributions
-            feedback = processor.generate_application_feedback(
-                df.iloc[0],
-                default_prob,
-                feature_contribs=feature_contribs
-            )
-            
-            st.subheader("Feature Contributions to Risk")
-            plt.figure(figsize=(8, 5))
-            shap.plots.bar(shap.Explanation(
-                values=shap_vals_for_row,
-                base_values=explainer.expected_value[1],
-                data=X_enc.iloc[0],
-                feature_names=X_enc.columns
-            ), max_display=10, show=False)
-            plt.tight_layout()
-            st.pyplot(plt.gcf())
-            plt.close()
+            feedback = processor.generate_application_feedback(df.iloc[0], default_prob)
 
             st.markdown("---")
             st.subheader("**What Looks Good in Your Application**")
