@@ -87,7 +87,7 @@ with tab1:
                 st.metric("Risk Score (Probability of Default)", f"{risk_score:.1f}%")
             with col_res2:
                 st.write("Risk Category")
-                if risk_category == "Approved":
+                if risk_category == "Approved ✅":
                     bg = "#d4edda"   # light green
                     fg = "#155724"
                 elif risk_category == "Medium Risk":
@@ -210,9 +210,10 @@ with tab2:
                     value=0,
                     step=1,
                 )
-                row = df.iloc[int(row_index)]
+                selected_row = df.iloc[int(row_index)]
                 row_prob = result_df["default_probability"].iloc[int(row_index)]
-                feedback = processor.generate_application_feedback(row, row_prob)
+                feedback = processor.generate_application_feedback(selected_row, row_prob)
+
 
                 st.markdown(f"**Application #{int(row_index)} Feedback**")
                 st.write(f"- Risk Score (Probability of Default): {row_prob:.1%}")
