@@ -155,7 +155,7 @@ with tab2:
 
     schema_df = processor.get_expected_schema()
     with st.expander("View Required Columns and Examples"):
-        st.dataframe(schema_df, use_container_width=True)
+        st.dataframe(schema_df, width="stretch")
 
     uploaded_file = st.file_uploader(
         "Upload CSV or Excel file with loan applications",
@@ -198,7 +198,7 @@ with tab2:
                 st.subheader("Results Table")
                 st.dataframe(
                     result_df.sort_values("risk_score_percent", ascending=False),
-                    use_container_width=True,
+                    width="stretch",
                 )
 
                 # Optional: per-row feedback via selection
