@@ -67,23 +67,22 @@ class CreditRiskPredictor:
         probs = self.predict_probability(X)
         risk_scores = probs * 100
 
-        result = X.copy()
-        result["default_probability"] = probs
-        result["risk_score_percent"] = risk_scores
-
-        # Use risk_score_percent to create bins
-        result["risk_category"] = pd.cut(
-            result["risk_score_percent"],
+        # Bin-based categories
+        risk_category_raw = pd.cut(
+            risk_scores,
             bins=[0, 10, 25, 100],
             labels=["Low Risk", "Medium Risk", "High Risk"],
             include_lowest=True,
-            right=True,
+            right=False  # left-inclusive
         )
 
-        # Optional: mark "Approved ✅" only for the lowest-risk bin
-        result["risk_category"] = result["risk_category"].replace({"Low Risk": "Approved ✅"})
+        # Only override with "High Risk" if above threshold
+        risk_category = pd.Series(risk_category_raw, index=X.index)
+        risk_category[probs >= threshold] = "High Risk"
+        risk_category[probs < 0.10] = "Low Risk"  # optional
 
-        # predicted default based on threshold
-        result["predicted_default"] = (probs >= threshold).astype(int)
-
-        return result
+        # Build result
+        result = X.copy()
+        result["default_probability"] = probs
+        result["risk_score_percent"] = risk_scores
+        result["risk_category"] = risk_category
