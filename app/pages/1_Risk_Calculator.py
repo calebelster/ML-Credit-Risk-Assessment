@@ -117,11 +117,13 @@ with tab1:
             feedback = processor.generate_application_feedback(df.iloc[0], default_prob)
 
             st.markdown("---")
-            st.subheader("What Looks Good in Your Application")
-            st.write(feedback["good"])
+            st.markdown("**What Looks Good in Your Application**")
+            for item in feedback["good"]:
+                st.markdown(f"- {item}")
 
-            st.subheader("Where You Could Improve")
-            st.write(feedback["improve"])
+            st.markdown("**What needs improvement:**")
+            for item in feedback["improve"]:
+                st.markdown(f"- {item}")
 
             st.subheader("Overall Assessment")
             st.write(feedback["overall"])
@@ -226,9 +228,9 @@ with tab2:
                 for item in feedback["improve"]:
                     st.markdown(f"- {item}")
 
-                st.markdown("**Overall assessment:**")
-                for item in feedback["overall"]:
-                    st.markdown(f"- {item}")
+                st.markdown("Overall Assessment")
+                st.write(feedback["overall"])
+
 
                 # Download
                 csv = result_df.to_csv(index=False)
