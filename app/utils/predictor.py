@@ -68,18 +68,11 @@ class CreditRiskPredictor:
         risk_scores = probs * 100
         risk_preds = (probs >= threshold).astype(int)
 
-        risk_category_raw = pd.cut(
+        # Pure bin-based categories
+        risk_category = pd.cut(
             risk_scores,
             bins=[0, 10, 25, 100],
             labels=["Low Risk", "Medium Risk", "High Risk"],
-        )
-
-        risk_category = pd.Series(
-            [
-                "Approved ✅" if pred == 0 else cat
-                for pred, cat in zip(risk_preds, risk_category_raw)
-            ],
-            index=X.index,
         )
 
         result = X.copy()
