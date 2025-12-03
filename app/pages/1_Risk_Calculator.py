@@ -214,18 +214,21 @@ with tab2:
                 row_prob = result_df["default_probability"].iloc[int(row_index)]
                 feedback = processor.generate_application_feedback(selected_row, row_prob)
 
-
+        
                 st.markdown(f"**Application #{int(row_index)} Feedback**")
                 st.write(f"- Risk Score (Probability of Default): {row_prob:.1%}")
 
-                st.markdown("**What looks good:**")
-                st.write(feedback["good"])
+                st.markdown("**What Looks Good in Your Application**")
+                for item in feedback["good"]:
+                    st.markdown(f"- {item}")
 
                 st.markdown("**What needs improvement:**")
-                st.write(feedback["improve"])
+                for item in feedback["improve"]:
+                    st.markdown(f"- {item}")
 
                 st.markdown("**Overall assessment:**")
-                st.write(feedback["overall"])
+                for item in feedback["overall"]:
+                    st.markdown(f"- {item}")
 
                 # Download
                 csv = result_df.to_csv(index=False)

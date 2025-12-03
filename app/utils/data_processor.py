@@ -242,9 +242,9 @@ class DataProcessor:
                     add_pos(f"Factor: {feat} helps reduce risk (impact ≈ {val:.3f}).")
 
         # Final text summary
-        if default_prob < 0.3:
+        if default_prob < 0.1:
             overall = "Low risk — this application looks favorable."
-        elif default_prob < 0.6:
+        elif default_prob < 0.25:
             overall = "Moderate risk — you have strengths and areas to improve."
         else:
             overall = "High risk — significant improvements are recommended."
