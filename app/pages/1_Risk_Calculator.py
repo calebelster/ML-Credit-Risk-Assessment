@@ -115,12 +115,21 @@ with tab1:
 
             st.markdown(f"**Decision Threshold Used:** {decision_threshold:.2f}")
 
-            # Tailored feedback
-            shap_contribs_list = processor.compute_shap_values(
-                predictor.base_models["rf"],  # <- use RF base model
-                df,
-                predictor.feature_names
+            X_enc = processor.preprocess_for_prediction(df, predictor.feature_names)
+            X_imp = pd.DataFrame(
+                predictor.feature_imputer.transform(X_enc),
+                columns=X_enc.columns,
+                index=X_enc.index
             )
+
+            # SHAP TreeExplainer for RF base model
+            explainer = shap.TreeExplainer(predictor.base_models["rf"])
+            shap_exp = explainer(X_imp)  # returns a single Explanation object
+
+            # Generate feature contributions dict for feedback
+            shap_contribs_list = []
+            for i in range(len(df)):
+                shap_contribs_list.append(dict(zip(X_imp.columns, shap_exp.values[i])))
 
             # Generate feedback including SHAP contributions
             feedback = processor.generate_application_feedback(
@@ -129,26 +138,12 @@ with tab1:
                 feature_contribs=shap_contribs_list[0]
             )
 
-            # Optional: SHAP bar plot for the RF model
+            # Plot SHAP summary bar
             st.subheader("Feature Contributions to Risk")
-
-            # Preprocess input exactly as the model expects
-            X_enc = processor.preprocess_for_prediction(df, predictor.feature_names)
-            X_imp = pd.DataFrame(
-                predictor.feature_imputer.transform(X_enc),
-                columns=X_enc.columns,
-                index=X_enc.index
-            )
-
-            # Use SHAP TreeExplainer on RF base model
-            explainer = shap.TreeExplainer(predictor.base_models["rf"])
-            shap_values = explainer.shap_values(X_imp)
-
-            # Plot top 10 features
-            shap.plots.bar(shap_values[1], max_display=10, show=False)  # index 1 = class 1 (default)
+            shap.plots.bar(shap_exp, max_display=10, show=False)
             plt.tight_layout()
             st.pyplot(plt.gcf())
-            plt.clf()  # clear the figure for the next plot
+            plt.clf()
 
             st.markdown("---")
             st.subheader("**What Looks Good in Your Application**")
