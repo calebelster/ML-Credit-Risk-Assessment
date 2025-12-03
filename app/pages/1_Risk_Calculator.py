@@ -114,8 +114,12 @@ with tab1:
                 st.markdown(html, unsafe_allow_html=True)
 
             st.markdown(f"**Decision Threshold Used:** {decision_threshold:.2f}")
-            feedback = processor.generate_application_feedback(df.iloc[0], default_prob)
+            
+            raw = df.iloc[0].copy()
+            raw["predictor"] = predictor   # pass model inside row
+            raw["__raw_row"] = df.iloc[0]  # keep original clean row
 
+            feedback = processor.generate_application_feedback(raw, default_prob)
             st.markdown("---")
             st.subheader("**What Looks Good in Your Application**")
             for item in feedback["good"]:

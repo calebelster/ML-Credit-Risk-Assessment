@@ -146,6 +146,86 @@ class DataProcessor:
         X_enc = X_enc[feature_names]
 
         return X_enc
+    def _estimate_impact(self, predictor, row_df, feature, new_value):
+        """
+        Recompute predicted probability after modifying a single feature.
+        Returns (old_prob, new_prob, delta).
+        """
+        modified = row_df.copy()
+        modified.iloc[0][feature] = new_value
+
+        res = predictor.predict_batch(modified)
+        new_prob = float(res["default_probability"].iloc[0])
+        old_prob = float(row_df["__orig_prob"].iloc[0])
+        return old_prob, new_prob, new_prob - old_prob
+
+    def compute_actionable_changes(self, row: pd.Series, predictor):
+        """
+        Suggest concrete adjustments AND rank them by estimated impact.
+        """
+        row_df = pd.DataFrame([row])
+        baseline = predictor.predict_batch(row_df)
+        base_prob = float(baseline["default_probability"].iloc[0])
+        row_df["__orig_prob"] = base_prob
+
+        suggestions = []
+
+        # 1. Lower loan amount by 10–20%
+        loan_amnt = row["loan_amnt"]
+        if loan_amnt > 0:
+            new_amount = loan_amnt * 0.85
+            old, new, delta = self._estimate_impact(predictor, row_df, "loan_amnt", new_amount)
+            suggestions.append({
+                "feature": "loan_amnt",
+                "current": loan_amnt,
+                "recommended": round(new_amount, 2),
+                "impact": delta,
+                "impact_note": "Reducing loan request by ~15% lowers perceived burden."
+            })
+
+        # 2. Increase employment length (simulate future scenario)
+        emp = row["person_emp_length"]
+        if emp < 5:
+            new_emp = emp + 2
+            old, new, delta = self._estimate_impact(predictor, row_df, "person_emp_length", new_emp)
+            suggestions.append({
+                "feature": "person_emp_length",
+                "current": emp,
+                "recommended": new_emp,
+                "impact": delta,
+                "impact_note": "Longer job tenure indicates improved income stability."
+            })
+
+        # 3. Reduce interest rate (simulate negotiation)
+        ir = row["loan_int_rate"]
+        if ir > 8:
+            new_ir = ir - 1.5
+            old, new, delta = self._estimate_impact(predictor, row_df, "loan_int_rate", new_ir)
+            suggestions.append({
+                "feature": "loan_int_rate",
+                "current": ir,
+                "recommended": round(new_ir, 1),
+                "impact": delta,
+                "impact_note": "Lower interest rate reduces monthly payments."
+            })
+
+        # 4. Reduce loan-to-income ratio (via higher reported income)
+        inc = row["person_income"]
+        if inc > 0:
+            new_inc = inc * 1.15
+            old, new, delta = self._estimate_impact(predictor, row_df, "person_income", new_inc)
+            suggestions.append({
+                "feature": "person_income",
+                "current": inc,
+                "recommended": round(new_inc, 2),
+                "impact": delta,
+                "impact_note": "Higher verifiable income improves affordability measures."
+            })
+
+        # Sort by largest risk reduction
+        suggestions_sorted = sorted(suggestions, key=lambda x: x["impact"])
+
+        return suggestions_sorted[:3]  # top 3 only
 
     def generate_application_feedback(
             self,
@@ -250,37 +330,17 @@ class DataProcessor:
         else:
             overall = "High risk — significant improvements are recommended."
 
+        actionable = []
+        if "predictor" in row:
+            try:
+                actionable = self.compute_actionable_changes(row["__raw_row"], row["predictor"])
+            except Exception:
+                actionable = []
+
         return {
             "good": positives or ["No major strengths identified."],
             "improve": negatives or ["No major risk factors identified."],
             "overall": overall,
             "default_prob": float(default_prob),
+            "most_impactful_changes": actionable
         }
-    
-    def compute_shap_values(self, model, X: pd.DataFrame, feature_names: List[str]):
-        """
-        Compute SHAP values for each row in X using the trained model.
-
-        Parameters:
-        - model: trained scikit-learn or tree-based model
-        - X: input features DataFrame (raw or preprocessed)
-        - feature_names: list of features expected by the model
-
-        Returns:
-        - List[Dict]: list of dictionaries mapping feature -> contribution per row
-        """
-        # Preprocess to one-hot encode and align with training
-        X_enc = self.preprocess_for_prediction(X, feature_names)
-
-        # Choose the right explainer
-        # For tree-based models (RandomForest, XGBoost, LightGBM, etc.)
-        explainer = shap.TreeExplainer(model)
-        shap_values = explainer(X_enc)  # returns array-like for each row
-
-        # Convert to list of dicts per row
-        contributions = []
-        for i in range(len(X_enc)):
-            row_contrib = dict(zip(X_enc.columns, shap_values[i]))
-            contributions.append(row_contrib)
-
-        return contributions
