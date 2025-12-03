@@ -1,4 +1,5 @@
 import pandas as pd
+import shap
 from typing import Dict, List, Optional
 
 
@@ -255,3 +256,31 @@ class DataProcessor:
             "overall": overall,
             "default_prob": float(default_prob),
         }
+    
+    def compute_shap_values(self, model, X: pd.DataFrame, feature_names: List[str]):
+        """
+        Compute SHAP values for each row in X using the trained model.
+
+        Parameters:
+        - model: trained scikit-learn or tree-based model
+        - X: input features DataFrame (raw or preprocessed)
+        - feature_names: list of features expected by the model
+
+        Returns:
+        - List[Dict]: list of dictionaries mapping feature -> contribution per row
+        """
+        # Preprocess to one-hot encode and align with training
+        X_enc = self.preprocess_for_prediction(X, feature_names)
+
+        # Choose the right explainer
+        # For tree-based models (RandomForest, XGBoost, LightGBM, etc.)
+        explainer = shap.TreeExplainer(model)
+        shap_values = explainer(X_enc)  # returns array-like for each row
+
+        # Convert to list of dicts per row
+        contributions = []
+        for i in range(len(X_enc)):
+            row_contrib = dict(zip(X_enc.columns, shap_values[i]))
+            contributions.append(row_contrib)
+
+        return contributions
