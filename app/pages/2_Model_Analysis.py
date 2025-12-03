@@ -105,7 +105,7 @@ with tab1:
         cv_df = cv_metrics[selected_model]
 
         fig = ModelVisualizations.plot_cv_stability(cv_df)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
         col1, col2, col3 = st.columns(3)
         with col1:
@@ -116,7 +116,7 @@ with tab1:
             st.metric("Mean Brier", f"{cv_df['Brier'].mean():.3f}", f"±{cv_df['Brier'].std():.3f}")
 
         st.markdown("#### Per-Fold Metrics")
-        st.dataframe(cv_df, use_container_width=True)
+        st.dataframe(cv_df, width="stretch")
 
 # TAB 2
 with tab2:
@@ -142,7 +142,7 @@ with tab2:
         y_pred = test_df["y_pred"].values
 
         fig_cm = ModelVisualizations.plot_confusion_matrix(y_true, y_pred, selected_test_model)
-        st.plotly_chart(fig_cm, use_container_width=True)
+        st.plotly_chart(fig_cm, width="stretch")
 
         col1, col2, col3, col4 = st.columns(4)
         with col1:
@@ -193,7 +193,7 @@ with tab3:
         fig_comp = ModelVisualizations.plot_metrics_comparison(
             comp_df[["Model", "AUC", "PR-AUC", "F1-Score", "LogLoss"]]
         )
-        st.plotly_chart(fig_comp, use_container_width=True)
+        st.plotly_chart(fig_comp, width="stretch")
 
         st.markdown("---")
 
@@ -212,7 +212,7 @@ with tab3:
             barmode="group",
             title="Accuracy, Precision, Recall by Model",
         )
-        st.plotly_chart(fig_apr, use_container_width=True)
+        st.plotly_chart(fig_apr, width="stretch")
 
         st.markdown("---")
         st.markdown(
