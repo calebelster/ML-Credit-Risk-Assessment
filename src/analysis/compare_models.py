@@ -20,14 +20,34 @@ OUTPUT_DIR = Path(__file__).parent.parent.parent / "output"
 OUTPUT_DIR.mkdir(exist_ok=True)
 
 files = {
-    'Random Forest': OUTPUT_DIR / "random_forest_preds.csv",
-    'Gradient Boost': OUTPUT_DIR / "grad_boost_preds.csv",
-    'Logistic Regression': OUTPUT_DIR / "log_reg_preds.csv",
-    'Neural Net': OUTPUT_DIR / "neural_net_preds.csv",
-    'Ensemble Bagging': OUTPUT_DIR / "ensemble_bagging_preds.csv",
-    'Ensemble Voting': OUTPUT_DIR / "ensemble_voting_preds.csv",
-    'Ensemble Stacking': OUTPUT_DIR / "ensemble_stacking_preds.csv",
-    'Ensemble Blending': OUTPUT_DIR / "ensemble_blending_preds.csv",
+    # Base models
+    "Random Forest": OUTPUT_DIR / "random_forest_preds.csv",
+    "Gradient Boost": OUTPUT_DIR / "grad_boost_preds.csv",
+    "Logistic Regression": OUTPUT_DIR / "log_reg_preds.csv",
+    "Neural Net": OUTPUT_DIR / "neural_net_preds.csv",
+
+    # Old single ensemble versions (optional if you still have them)
+    "Ensemble Bagging (legacy)": OUTPUT_DIR / "ensemble_bagging_preds.csv",
+    "Ensemble Voting (legacy)": OUTPUT_DIR / "ensemble_voting_preds.csv",
+    "Ensemble Stacking (legacy)": OUTPUT_DIR / "ensemble_stacking_preds.csv",
+    "Ensemble Blending (legacy)": OUTPUT_DIR / "ensemble_blending_preds.csv",
+
+    # New ensemble variants
+    "Ensemble Bagging (full)": OUTPUT_DIR / "ensemble_bagging_full_preds.csv",
+    "Ensemble Bagging (no NN)": OUTPUT_DIR / "ensemble_bagging_no_nn_preds.csv",
+    "Ensemble Bagging (RF+GB)": OUTPUT_DIR / "ensemble_bagging_rf_gb_preds.csv",
+
+    "Ensemble Voting (full)": OUTPUT_DIR / "ensemble_voting_full_preds.csv",
+    "Ensemble Voting (no NN)": OUTPUT_DIR / "ensemble_voting_no_nn_preds.csv",
+    "Ensemble Voting (RF+GB)": OUTPUT_DIR / "ensemble_voting_rf_gb_preds.csv",
+
+    "Ensemble Stacking (full)": OUTPUT_DIR / "ensemble_stacking_full_preds.csv",
+    "Ensemble Stacking (no NN)": OUTPUT_DIR / "ensemble_stacking_no_nn_preds.csv",
+    "Ensemble Stacking (RF+GB)": OUTPUT_DIR / "ensemble_stacking_rf_gb_preds.csv",
+
+    "Ensemble Blending (full)": OUTPUT_DIR / "ensemble_blending_full_preds.csv",
+    "Ensemble Blending (no NN)": OUTPUT_DIR / "ensemble_blending_no_nn_preds.csv",
+    "Ensemble Blending (RF+GB)": OUTPUT_DIR / "ensemble_blending_rf_gb_preds.csv",
 }
 
 metrics = {}

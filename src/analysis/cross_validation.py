@@ -32,31 +32,16 @@ def ks_statistic(y_true, y_scores):
 
 
 def load_and_preprocess():
-    """
-    Load data, drop loan_grade, one-hot encode, impute, scale.
-
-    Returns
-    -------
-    X_imp : pd.DataFrame
-        Imputed (not scaled) features for tree models
-    X_scaled : pd.DataFrame
-        Imputed + scaled features for LR/NN
-    y : np.ndarray
-        Target (0 = no default, 1 = default)
-    """
     df = pd.read_csv(DATA_PATH)
 
-    # Remove loan_grade (user doesn’t know this value)
     if "loan_grade" in df.columns:
         df = df.drop("loan_grade", axis=1)
 
     X = df.drop("loan_status", axis=1)
     y = df["loan_status"].values
 
-    # One-hot encode
     X_enc = pd.get_dummies(X)
 
-    # Impute
     imputer = SimpleImputer(strategy="median")
     X_imp = pd.DataFrame(
         imputer.fit_transform(X_enc),
@@ -64,7 +49,6 @@ def load_and_preprocess():
         index=X_enc.index,
     )
 
-    # Scale
     scaler = StandardScaler()
     X_scaled = pd.DataFrame(
         scaler.fit_transform(X_imp),
@@ -78,22 +62,15 @@ def load_and_preprocess():
 def cross_validate_all(n_splits=5, random_state=42):
     """
     Perform K-fold CV for:
-      - Random Forest
-      - Gradient Boost
-      - Logistic Regression
-      - Neural Net
-      - Ensemble Bagging
-      - Ensemble Voting
-      - Ensemble Stacking
-      - Ensemble Blending
-
-    Writes one CSV per model into OUTPUT_DIR.
+      - Base models (RF, GB, LR, NN)
+      - Ensemble Bagging/Voting/Stacking/Blending for:
+          * full base set (LR+RF+GB+NN)
+          * no NN (LR+RF+GB)
+          * RF+GB only
     """
     X_imp, X_scaled, y = load_and_preprocess()
-
     skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
 
-    # Containers for metrics
     base_model_metrics = {
         "random_forest": {"AUC": [], "PR_AUC": [], "Brier": [], "KS": [], "LogLoss": []},
         "grad_boost": {"AUC": [], "PR_AUC": [], "Brier": [], "KS": [], "LogLoss": []},
@@ -101,11 +78,28 @@ def cross_validate_all(n_splits=5, random_state=42):
         "neural_net": {"AUC": [], "PR_AUC": [], "Brier": [], "KS": [], "LogLoss": []},
     }
 
+    # ensemble_metrics[ensemble_type][variant] -> dict of lists
     ensemble_metrics = {
-        "bagging": {"AUC": [], "PR_AUC": [], "Brier": [], "KS": [], "LogLoss": []},
-        "voting": {"AUC": [], "PR_AUC": [], "Brier": [], "KS": [], "LogLoss": []},
-        "stacking": {"AUC": [], "PR_AUC": [], "Brier": [], "KS": [], "LogLoss": []},
-        "blending": {"AUC": [], "PR_AUC": [], "Brier": [], "KS": [], "LogLoss": []},
+        "bagging": {
+            "full": {"AUC": [], "PR_AUC": [], "Brier": [], "KS": [], "LogLoss": []},
+            "no_nn": {"AUC": [], "PR_AUC": [], "Brier": [], "KS": [], "LogLoss": []},
+            "rf_gb": {"AUC": [], "PR_AUC": [], "Brier": [], "KS": [], "LogLoss": []},
+        },
+        "voting": {
+            "full": {"AUC": [], "PR_AUC": [], "Brier": [], "KS": [], "LogLoss": []},
+            "no_nn": {"AUC": [], "PR_AUC": [], "Brier": [], "KS": [], "LogLoss": []},
+            "rf_gb": {"AUC": [], "PR_AUC": [], "Brier": [], "KS": [], "LogLoss": []},
+        },
+        "stacking": {
+            "full": {"AUC": [], "PR_AUC": [], "Brier": [], "KS": [], "LogLoss": []},
+            "no_nn": {"AUC": [], "PR_AUC": [], "Brier": [], "KS": [], "LogLoss": []},
+            "rf_gb": {"AUC": [], "PR_AUC": [], "Brier": [], "KS": [], "LogLoss": []},
+        },
+        "blending": {
+            "full": {"AUC": [], "PR_AUC": [], "Brier": [], "KS": [], "LogLoss": []},
+            "no_nn": {"AUC": [], "PR_AUC": [], "Brier": [], "KS": [], "LogLoss": []},
+            "rf_gb": {"AUC": [], "PR_AUC": [], "Brier": [], "KS": [], "LogLoss": []},
+        },
     }
 
     fold_idx = 0
@@ -117,22 +111,18 @@ def cross_validate_all(n_splits=5, random_state=42):
         X_scaled_train, X_scaled_test = X_scaled.iloc[train_idx], X_scaled.iloc[test_idx]
         y_train, y_test = y[train_idx], y[test_idx]
 
-        # ------------------------------
         # Base models
-        # ------------------------------
         lr = LogisticRegression(max_iter=2500, solver="lbfgs", random_state=random_state)
         rf = RandomForestClassifier(n_estimators=100, random_state=random_state)
         gb = GradientBoostingClassifier(n_estimators=100, random_state=random_state)
         nn = MLPClassifier(hidden_layer_sizes=(30, 15), max_iter=2000, random_state=random_state)
 
-        # Fit base models (LR/NN on scaled, RF/GB on imp)
         lr.fit(X_scaled_train, y_train)
         nn.fit(X_scaled_train, y_train)
         rf.fit(X_imp_train, y_train)
         gb.fit(X_imp_train, y_train)
 
-        # Predict probabilities for each base model
-        # Random Forest
+        # Base metrics
         rf_prob = rf.predict_proba(X_imp_test)[:, 1]
         base_model_metrics["random_forest"]["AUC"].append(roc_auc_score(y_test, rf_prob))
         base_model_metrics["random_forest"]["PR_AUC"].append(average_precision_score(y_test, rf_prob))
@@ -140,7 +130,6 @@ def cross_validate_all(n_splits=5, random_state=42):
         base_model_metrics["random_forest"]["KS"].append(ks_statistic(y_test, rf_prob))
         base_model_metrics["random_forest"]["LogLoss"].append(log_loss(y_test, rf_prob))
 
-        # Gradient Boost
         gb_prob = gb.predict_proba(X_imp_test)[:, 1]
         base_model_metrics["grad_boost"]["AUC"].append(roc_auc_score(y_test, gb_prob))
         base_model_metrics["grad_boost"]["PR_AUC"].append(average_precision_score(y_test, gb_prob))
@@ -148,7 +137,6 @@ def cross_validate_all(n_splits=5, random_state=42):
         base_model_metrics["grad_boost"]["KS"].append(ks_statistic(y_test, gb_prob))
         base_model_metrics["grad_boost"]["LogLoss"].append(log_loss(y_test, gb_prob))
 
-        # Logistic Regression
         lr_prob = lr.predict_proba(X_scaled_test)[:, 1]
         base_model_metrics["log_reg"]["AUC"].append(roc_auc_score(y_test, lr_prob))
         base_model_metrics["log_reg"]["PR_AUC"].append(average_precision_score(y_test, lr_prob))
@@ -156,7 +144,6 @@ def cross_validate_all(n_splits=5, random_state=42):
         base_model_metrics["log_reg"]["KS"].append(ks_statistic(y_test, lr_prob))
         base_model_metrics["log_reg"]["LogLoss"].append(log_loss(y_test, lr_prob))
 
-        # Neural Net
         nn_prob = nn.predict_proba(X_scaled_test)[:, 1]
         base_model_metrics["neural_net"]["AUC"].append(roc_auc_score(y_test, nn_prob))
         base_model_metrics["neural_net"]["PR_AUC"].append(average_precision_score(y_test, nn_prob))
@@ -164,134 +151,204 @@ def cross_validate_all(n_splits=5, random_state=42):
         base_model_metrics["neural_net"]["KS"].append(ks_statistic(y_test, nn_prob))
         base_model_metrics["neural_net"]["LogLoss"].append(log_loss(y_test, nn_prob))
 
-        # ------------------------------
-        # Build base_models list used by ensembles
-        # ------------------------------
-        base_models = [
+        # Base lists for ensembles
+        base_full = [
             ("lr", lr, X_scaled_train, X_scaled_test),
             ("rf", rf, X_imp_train, X_imp_test),
             ("gb", gb, X_imp_train, X_imp_test),
             ("nn", nn, X_scaled_train, X_scaled_test),
         ]
+        base_no_nn = [
+            ("lr", lr, X_scaled_train, X_scaled_test),
+            ("rf", rf, X_imp_train, X_imp_test),
+            ("gb", gb, X_imp_train, X_imp_test),
+        ]
+        base_rf_gb = [
+            ("rf", rf, X_imp_train, X_imp_test),
+            ("gb", gb, X_imp_train, X_imp_test),
+        ]
 
-        # ------------------------------
-        # Voting (soft)
-        # ------------------------------
-        voting = VotingClassifier(
+        # Voting
+        voting_full = VotingClassifier(
             estimators=[("lr", lr), ("rf", rf), ("gb", gb), ("nn", nn)],
             voting="soft",
         )
-        voting.fit(X_scaled_train, y_train)
-        y_prob_v = voting.predict_proba(X_scaled_test)[:, 1]
+        voting_full.fit(X_scaled_train, y_train)
+        pv = voting_full.predict_proba(X_scaled_test)[:, 1]
+        for mname, val in [
+            ("AUC", roc_auc_score(y_test, pv)),
+            ("PR_AUC", average_precision_score(y_test, pv)),
+            ("Brier", brier_score_loss(y_test, pv)),
+            ("KS", ks_statistic(y_test, pv)),
+            ("LogLoss", log_loss(y_test, pv)),
+        ]:
+            ensemble_metrics["voting"]["full"][mname].append(val)
 
-        ensemble_metrics["voting"]["AUC"].append(roc_auc_score(y_test, y_prob_v))
-        ensemble_metrics["voting"]["PR_AUC"].append(average_precision_score(y_test, y_prob_v))
-        ensemble_metrics["voting"]["Brier"].append(brier_score_loss(y_test, y_prob_v))
-        ensemble_metrics["voting"]["KS"].append(ks_statistic(y_test, y_prob_v))
-        ensemble_metrics["voting"]["LogLoss"].append(log_loss(y_test, y_prob_v))
-
-        # ------------------------------
-        # Bagging (average of base probs)
-        # ------------------------------
-        bagging_probs = np.mean(
-            [model.predict_proba(Xte)[:, 1] for (_, model, _, Xte) in base_models],
-            axis=0,
+        voting_no_nn = VotingClassifier(
+            estimators=[("lr", lr), ("rf", rf), ("gb", gb)],
+            voting="soft",
         )
-        ensemble_metrics["bagging"]["AUC"].append(roc_auc_score(y_test, bagging_probs))
-        ensemble_metrics["bagging"]["PR_AUC"].append(average_precision_score(y_test, bagging_probs))
-        ensemble_metrics["bagging"]["Brier"].append(brier_score_loss(y_test, bagging_probs))
-        ensemble_metrics["bagging"]["KS"].append(ks_statistic(y_test, bagging_probs))
-        ensemble_metrics["bagging"]["LogLoss"].append(log_loss(y_test, bagging_probs))
+        voting_no_nn.fit(X_scaled_train, y_train)
+        pv2 = voting_no_nn.predict_proba(X_scaled_test)[:, 1]
+        for mname, val in [
+            ("AUC", roc_auc_score(y_test, pv2)),
+            ("PR_AUC", average_precision_score(y_test, pv2)),
+            ("Brier", brier_score_loss(y_test, pv2)),
+            ("KS", ks_statistic(y_test, pv2)),
+            ("LogLoss", log_loss(y_test, pv2)),
+        ]:
+            ensemble_metrics["voting"]["no_nn"][mname].append(val)
 
-        # ------------------------------
-        # Stacking (OOF on train in this fold)
-        # ------------------------------
-        inner_kf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
-        n_train_fold = X_imp_train.shape[0]
-        meta_train_fold = np.zeros((n_train_fold, len(base_models)))
-        meta_test_fold = np.zeros((X_imp_test.shape[0], len(base_models)))
-
-        for i, (name, model, Xtr_use, Xte_use) in enumerate(base_models):
-            # OOF on TRAIN
-            oof_preds = np.zeros(n_train_fold)
-            for inner_train_idx, inner_val_idx in inner_kf.split(Xtr_use, y_train):
-                m_clone = type(model)(**model.get_params())
-                m_clone.fit(Xtr_use.iloc[inner_train_idx], y_train[inner_train_idx])
-                oof_preds[inner_val_idx] = m_clone.predict_proba(Xtr_use.iloc[inner_val_idx])[:, 1]
-            meta_train_fold[:, i] = oof_preds
-
-            # Fit on all TRAIN in this fold, predict TEST
-            m_final = type(model)(**model.get_params())
-            m_final.fit(Xtr_use, y_train)
-            meta_test_fold[:, i] = m_final.predict_proba(Xte_use)[:, 1]
-
-        # Scale meta-features and fit meta-learner
-        stack_scaler = StandardScaler()
-        meta_train_scaled = stack_scaler.fit_transform(meta_train_fold)
-        meta_test_scaled = stack_scaler.transform(meta_test_fold)
-
-        stacker = LogisticRegression(max_iter=2500, random_state=random_state)
-        stacker.fit(meta_train_scaled, y_train)
-        y_prob_stack = stacker.predict_proba(meta_test_scaled)[:, 1]
-
-        ensemble_metrics["stacking"]["AUC"].append(roc_auc_score(y_test, y_prob_stack))
-        ensemble_metrics["stacking"]["PR_AUC"].append(average_precision_score(y_test, y_prob_stack))
-        ensemble_metrics["stacking"]["Brier"].append(brier_score_loss(y_test, y_prob_stack))
-        ensemble_metrics["stacking"]["KS"].append(ks_statistic(y_test, y_prob_stack))
-        ensemble_metrics["stacking"]["LogLoss"].append(log_loss(y_test, y_prob_stack))
-
-        # ------------------------------
-        # Blending (inner split on TRAIN, evaluate on TEST)
-        # ------------------------------
-        meta_train_full = np.column_stack(
-            [model.predict_proba(Xtr)[:, 1] for (_, model, Xtr, _) in base_models]
+        voting_rf_gb = VotingClassifier(
+            estimators=[("rf", rf), ("gb", gb)],
+            voting="soft",
         )
-        meta_test_full = np.column_stack(
-            [model.predict_proba(Xte)[:, 1] for (_, model, _, Xte) in base_models]
-        )
+        voting_rf_gb.fit(X_imp_train, y_train)
+        pv3 = voting_rf_gb.predict_proba(X_imp_test)[:, 1]
+        for mname, val in [
+            ("AUC", roc_auc_score(y_test, pv3)),
+            ("PR_AUC", average_precision_score(y_test, pv3)),
+            ("Brier", brier_score_loss(y_test, pv3)),
+            ("KS", ks_statistic(y_test, pv3)),
+            ("LogLoss", log_loss(y_test, pv3)),
+        ]:
+            ensemble_metrics["voting"]["rf_gb"][mname].append(val)
 
-        X_meta_train, X_meta_blend, y_meta_train, y_meta_blend = train_test_split(
-            meta_train_full,
-            y_train,
-            test_size=0.2,
-            random_state=random_state,
-            stratify=y_train,
-        )
+        # Bagging helper
+        def bag_probs(base_list):
+            return np.mean(
+                [m.predict_proba(Xte)[:, 1] for (_, m, _, Xte) in base_list],
+                axis=0,
+            )
 
-        blend_scaler = StandardScaler()
-        X_meta_blend_scaled = blend_scaler.fit_transform(X_meta_blend)
-        X_meta_test_scaled = blend_scaler.transform(meta_test_full)
+        # Bagging full
+        pb = bag_probs(base_full)
+        for mname, val in [
+            ("AUC", roc_auc_score(y_test, pb)),
+            ("PR_AUC", average_precision_score(y_test, pb)),
+            ("Brier", brier_score_loss(y_test, pb)),
+            ("KS", ks_statistic(y_test, pb)),
+            ("LogLoss", log_loss(y_test, pb)),
+        ]:
+            ensemble_metrics["bagging"]["full"][mname].append(val)
 
-        meta_model = LogisticRegression(max_iter=2500, random_state=random_state)
-        meta_model.fit(X_meta_blend_scaled, y_meta_blend)
+        # Bagging no NN
+        pb2 = bag_probs(base_no_nn)
+        for mname, val in [
+            ("AUC", roc_auc_score(y_test, pb2)),
+            ("PR_AUC", average_precision_score(y_test, pb2)),
+            ("Brier", brier_score_loss(y_test, pb2)),
+            ("KS", ks_statistic(y_test, pb2)),
+            ("LogLoss", log_loss(y_test, pb2)),
+        ]:
+            ensemble_metrics["bagging"]["no_nn"][mname].append(val)
 
-        y_prob_blend = meta_model.predict_proba(X_meta_test_scaled)[:, 1]
+        # Bagging RF+GB
+        pb3 = bag_probs(base_rf_gb)
+        for mname, val in [
+            ("AUC", roc_auc_score(y_test, pb3)),
+            ("PR_AUC", average_precision_score(y_test, pb3)),
+            ("Brier", brier_score_loss(y_test, pb3)),
+            ("KS", ks_statistic(y_test, pb3)),
+            ("LogLoss", log_loss(y_test, pb3)),
+        ]:
+            ensemble_metrics["bagging"]["rf_gb"][mname].append(val)
 
-        ensemble_metrics["blending"]["AUC"].append(roc_auc_score(y_test, y_prob_blend))
-        ensemble_metrics["blending"]["PR_AUC"].append(average_precision_score(y_test, y_prob_blend))
-        ensemble_metrics["blending"]["Brier"].append(brier_score_loss(y_test, y_prob_blend))
-        ensemble_metrics["blending"]["KS"].append(ks_statistic(y_test, y_prob_blend))
-        ensemble_metrics["blending"]["LogLoss"].append(log_loss(y_test, y_prob_blend))
+        # Stacking helper
+        def stacking_from_base_list(base_list, key):
+            inner_kf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+            n_train_fold = X_imp_train.shape[0]
+            meta_tr = np.zeros((n_train_fold, len(base_list)))
+            meta_te = np.zeros((X_imp_test.shape[0], len(base_list)))
 
-    # --------------------------------
-    # After all folds, write CSVs
-    # --------------------------------
-    # Base models
+            for i, (name, model, Xtr_use, Xte_use) in enumerate(base_list):
+                oof = np.zeros(n_train_fold)
+                for inner_train_idx, inner_val_idx in inner_kf.split(Xtr_use, y_train):
+                    m_clone = type(model)(**model.get_params())
+                    m_clone.fit(Xtr_use.iloc[inner_train_idx], y_train[inner_train_idx])
+                    oof[inner_val_idx] = m_clone.predict_proba(Xtr_use.iloc[inner_val_idx])[:, 1]
+                meta_tr[:, i] = oof
+
+                m_final = type(model)(**model.get_params())
+                m_final.fit(Xtr_use, y_train)
+                meta_te[:, i] = m_final.predict_proba(Xte_use)[:, 1]
+
+            stack_scaler = StandardScaler()
+            meta_tr_s = stack_scaler.fit_transform(meta_tr)
+            meta_te_s = stack_scaler.transform(meta_te)
+
+            stacker = LogisticRegression(max_iter=2500, random_state=random_state)
+            stacker.fit(meta_tr_s, y_train)
+            p = stacker.predict_proba(meta_te_s)[:, 1]
+
+            for mname, val in [
+                ("AUC", roc_auc_score(y_test, p)),
+                ("PR_AUC", average_precision_score(y_test, p)),
+                ("Brier", brier_score_loss(y_test, p)),
+                ("KS", ks_statistic(y_test, p)),
+                ("LogLoss", log_loss(y_test, p)),
+            ]:
+                ensemble_metrics["stacking"][key][mname].append(val)
+
+        stacking_from_base_list(base_full, "full")
+        stacking_from_base_list(base_no_nn, "no_nn")
+        stacking_from_base_list(base_rf_gb, "rf_gb")
+
+        # Blending helper
+        def blending_from_base_list(base_list, key):
+            meta_tr_full = np.column_stack(
+                [m.predict_proba(Xtr)[:, 1] for (_, m, Xtr, _) in base_list]
+            )
+            meta_te_full = np.column_stack(
+                [m.predict_proba(Xte)[:, 1] for (_, m, _, Xte) in base_list]
+            )
+
+            X_meta_train, X_meta_blend, y_meta_train, y_meta_blend = train_test_split(
+                meta_tr_full,
+                y_train,
+                test_size=0.2,
+                random_state=random_state,
+                stratify=y_train,
+            )
+
+            blend_scaler = StandardScaler()
+            X_meta_blend_s = blend_scaler.fit_transform(X_meta_blend)
+            X_meta_test_s = blend_scaler.transform(meta_te_full)
+
+            meta_model = LogisticRegression(max_iter=2500, random_state=random_state)
+            meta_model.fit(X_meta_blend_s, y_meta_blend)
+            p = meta_model.predict_proba(X_meta_test_s)[:, 1]
+
+            for mname, val in [
+                ("AUC", roc_auc_score(y_test, p)),
+                ("PR_AUC", average_precision_score(y_test, p)),
+                ("Brier", brier_score_loss(y_test, p)),
+                ("KS", ks_statistic(y_test, p)),
+                ("LogLoss", log_loss(y_test, p)),
+            ]:
+                ensemble_metrics["blending"][key][mname].append(val)
+
+        blending_from_base_list(base_full, "full")
+        blending_from_base_list(base_no_nn, "no_nn")
+        blending_from_base_list(base_rf_gb, "rf_gb")
+
+    # Save base model CV metrics
     for name, m in base_model_metrics.items():
         df_metrics = pd.DataFrame(m)
         out_file = OUTPUT_DIR / f"{name}_cv_metrics.csv"
         df_metrics.to_csv(out_file, index=False)
         print(f"Saved CV metrics for {name} to {out_file}")
 
-    # Ensembles
-    for name, m in ensemble_metrics.items():
-        df_metrics = pd.DataFrame(m)
-        out_file = OUTPUT_DIR / f"ensemble_{name}_cv_metrics.csv"
-        df_metrics.to_csv(out_file, index=False)
-        print(f"Saved CV metrics for ensemble {name} to {out_file}")
+    # Save ensemble CV metrics (12 variants)
+    for ens_name, variants in ensemble_metrics.items():
+        for variant, m in variants.items():
+            df_metrics = pd.DataFrame(m)
+            out_file = OUTPUT_DIR / f"ensemble_{ens_name}_{variant}_cv_metrics.csv"
+            df_metrics.to_csv(out_file, index=False)
+            print(f"Saved CV metrics for ensemble {ens_name} ({variant}) to {out_file}")
 
 
 if __name__ == "__main__":
-    print("Running K-fold CV for base and ensemble models...")
+    print("Running K-fold CV for base and ensemble models (with variants)...")
     cross_validate_all()
     print("Done.")
