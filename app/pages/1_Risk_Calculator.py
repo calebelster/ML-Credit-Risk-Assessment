@@ -180,7 +180,7 @@ with tab1:
             st.markdown(f"- {item}")
 
         st.subheader("Overall Assessment")
-        st.write(feedback["overall"])
+        st.write(feedback["most_impactful_changes"])
 
 # -------------------------
 # TAB 2: BATCH UPLOAD
