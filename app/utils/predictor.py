@@ -68,17 +68,19 @@ class CreditRiskPredictor:
         risk_scores = probs * 100
         risk_preds = (probs >= threshold).astype(int)
 
-        # Pure bin-based categories
-        risk_category = pd.cut(
-            risk_scores,
-            bins=[0, 10, 25, 100],
-            labels=["Low Risk", "Medium Risk", "High Risk"],
-        )
-
         result = X.copy()
         result["default_probability"] = probs
         result["risk_score_percent"] = risk_scores
+
+        # Use risk_score_percent to create bins
+        result["risk_category"] = pd.cut(
+            result["risk_score_percent"],
+            bins=[0, 10, 25, 100],
+            labels=["Low Risk", "Medium Risk", "High Risk"],
+            include_lowest=True,
+            right=True,
+        )
+
         result["predicted_default"] = risk_preds
-        result["risk_category"] = risk_category
 
         return result
