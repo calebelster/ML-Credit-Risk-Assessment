@@ -12,16 +12,42 @@ sys.path.insert(0, str(app_dir))
 from utils.predictor import CreditRiskPredictor
 from utils.data_processor import DataProcessor
 
-st.set_page_config(page_title="Risk Calculator", layout="wide", initial_sidebar_state="expanded")
+# ============================================================
+#                     STREAMLIT SETTINGS
+# ============================================================
+st.set_page_config(
+    page_title="Risk Calculator",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
 st.title("💳 Credit Risk Assessment")
 st.markdown("**Assess loan default risk for individual or batch applications**")
 
-# Initialize
-predictor = CreditRiskPredictor()
-processor = DataProcessor()
+# ============================================================
+#                     🔥 CACHED LOADERS
+# ============================================================
 
-# Sidebar threshold
+@st.cache_resource
+def load_predictor():
+    return CreditRiskPredictor()
+
+@st.cache_resource
+def load_processor():
+    return DataProcessor()
+
+@st.cache_data
+def load_file_dataframe(processor, uploaded_file):
+    """Cache CSV/XLSX to avoid reloading when widgets update."""
+    return processor.csv_to_dataframe(uploaded_file)
+
+# Initialize cached resources
+predictor = load_predictor()
+processor = load_processor()
+
+# ============================================================
+#                     SIDEBAR SETTINGS
+# ============================================================
 st.sidebar.markdown("### ⚙️ Model Settings")
 decision_threshold = st.sidebar.slider(
     "Decision Threshold",
@@ -31,16 +57,18 @@ decision_threshold = st.sidebar.slider(
     step=0.05,
     help="Lower threshold = more conservative (catch more defaults). Higher threshold = more lenient (approve more loans)."
 )
-
 st.sidebar.markdown(f"**Current Threshold:** {decision_threshold:.2f}")
 
-# Tabs
+# ============================================================
+#                        MAIN TABS
+# ============================================================
 tab1, tab2 = st.tabs(["Single Application", "Batch Upload"])
 
-# ===================== TAB 1: SINGLE APPLICATION =====================
+# ============================================================
+#                TAB 1 — SINGLE APPLICATION
+# ============================================================
 with tab1:
     st.subheader("Enter Loan Application Details")
-
     col1, col2 = st.columns(2)
 
     with col1:
@@ -80,23 +108,23 @@ with tab1:
             risk_score = result["risk_score_percent"].values[0]
             default_prob = result["default_probability"].values[0]
             risk_category = result["risk_category"].values[0]
-            
 
             st.success("✅ Prediction Complete")
 
             col_res1, col_res2, col_res3 = st.columns(3)
             with col_res1:
                 st.metric("Risk Score (Probability of Default)", f"{risk_score:.1f}%")
+
             with col_res2:
                 st.write("Risk Category")
                 if risk_category == "Approved ✅":
-                    bg = "#d4edda"   # light green
+                    bg = "#d4edda"   # green
                     fg = "#155724"
                 elif risk_category == "Medium Risk":
-                    bg = "#fff3cd"   # light yellow
+                    bg = "#fff3cd"   # yellow
                     fg = "#856404"
                 else:
-                    bg = "#f8d7da"   # light red
+                    bg = "#f8d7da"   # red
                     fg = "#721c24"
 
                 html = f"""
@@ -114,12 +142,14 @@ with tab1:
                 st.markdown(html, unsafe_allow_html=True)
 
             st.markdown(f"**Decision Threshold Used:** {decision_threshold:.2f}")
-            
+
+            # Generate feedback
             raw = df.iloc[0].copy()
-            raw["predictor"] = predictor   # pass model inside row
-            raw["__raw_row"] = df.iloc[0]  # keep original clean row
+            raw["predictor"] = predictor
+            raw["__raw_row"] = df.iloc[0]
 
             feedback = processor.generate_application_feedback(raw, default_prob)
+
             st.markdown("---")
             st.subheader("**What Looks Good in Your Application**")
             for item in feedback["good"]:
@@ -132,32 +162,24 @@ with tab1:
             st.subheader("Overall Assessment")
             st.write(feedback["overall"])
 
-
-
         except Exception as e:
             st.error(f"Error: {str(e)}")
 
-# ===================== TAB 2: BATCH UPLOAD =====================
+
+# ============================================================
+#                TAB 2 — BATCH UPLOAD
+# ============================================================
 with tab2:
     st.subheader("Upload Batch Applications")
 
     st.markdown(
         """
         #### Required File Format
-
-        Your CSV or Excel file must contain the following columns (case-sensitive):
-
-        - `person_age` (integer): Age in years (≥ 18).
-        - `person_income` (float): Annual gross income in USD.
-        - `person_emp_length` (integer): Years in current employment.
-        - `loan_amnt` (float): Requested loan amount in USD.
-        - `loan_int_rate` (float): Nominal interest rate in percent.
-        - `cb_person_cred_hist_length` (integer): Years since first credit line.
-        - `person_home_ownership` (string): One of `RENT`, `OWN`, `MORTGAGE`, `OTHER`.
-        - `loan_intent` (string): One of `PERSONAL`, `EDUCATION`, `MEDICAL`, `VENTURE`, `HOMEIMPROVEMENT`, `DEBTCONSOLIDATION`.
-        - `cb_person_default_on_file` (string): `Y` if there is a prior default, `N` otherwise.
-
-        Additional columns will be ignored (for example, `loan_grade` is not used).
+        Your CSV or Excel file must contain these columns:
+        - `person_age`, `person_income`, `person_emp_length`
+        - `loan_amnt`, `loan_int_rate`
+        - `cb_person_cred_hist_length`, `cb_person_default_on_file`
+        - `person_home_ownership`, `loan_intent`
         """
     )
 
@@ -166,16 +188,14 @@ with tab2:
         st.dataframe(schema_df, width="stretch")
 
     uploaded_file = st.file_uploader(
-        "Upload CSV or Excel file with loan applications",
-        type=["csv", "xlsx", "xls"],
-        help="File must contain all required columns shown above.",
+        "Upload CSV or Excel file",
+        type=["csv", "xlsx", "xls"]
     )
 
     if uploaded_file:
         try:
-            df = processor.csv_to_dataframe(uploaded_file)
+            df = load_file_dataframe(processor, uploaded_file)
 
-            # Optional derived feature for interpretation (not used directly by model)
             df["loan_percent_income"] = df["loan_amnt"] / df["person_income"].replace(0, pd.NA)
 
             st.write(f"📊 Loaded {len(df)} applications")
@@ -186,7 +206,7 @@ with tab2:
 
                 st.success("✅ Batch processing complete")
 
-                # Summary by risk category
+                # Summary
                 col_s1, col_s2, col_s3 = st.columns(3)
                 low = (result_df["risk_category"].astype(str).str.contains("Low")).sum()
                 med = (result_df["risk_category"].astype(str).str.contains("Medium")).sum()
@@ -204,12 +224,11 @@ with tab2:
 
                 st.markdown("---")
                 st.subheader("Results Table")
-                st.dataframe(
-                    result_df.sort_values("risk_score_percent", ascending=False),
-                    width="stretch",
-                )
+                st.dataframe(result_df.sort_values("risk_score_percent", ascending=False))
 
-                # Optional: per-row feedback via selection
+                # --------------------------
+                # Row-by-row feedback viewer
+                # --------------------------
                 st.markdown("#### View Feedback for a Single Application")
                 row_index = st.number_input(
                     "Enter row number (0-based index) to inspect:",
@@ -218,25 +237,24 @@ with tab2:
                     value=0,
                     step=1,
                 )
+
                 selected_row = df.iloc[int(row_index)]
                 row_prob = result_df["default_probability"].iloc[int(row_index)]
                 feedback = processor.generate_application_feedback(selected_row, row_prob)
 
-        
-                st.markdown(f"**Application #{int(row_index)} Feedback**")
-                st.write(f"- Risk Score (Probability of Default): {row_prob:.1%}")
+                st.markdown(f"### Application #{int(row_index)} Feedback")
+                st.write(f"- **Risk Score:** {row_prob:.1%}")
 
-                st.markdown("**What Looks Good in Your Application**")
+                st.markdown("**What Looks Good in This Application**")
                 for item in feedback["good"]:
                     st.markdown(f"- {item}")
 
-                st.markdown("**What needs improvement:**")
+                st.markdown("**What Needs Improvement**")
                 for item in feedback["improve"]:
                     st.markdown(f"- {item}")
 
-                st.markdown("Overall Assessment")
+                st.markdown("**Overall Assessment**")
                 st.write(feedback["overall"])
-
 
                 # Download
                 csv = result_df.to_csv(index=False)
@@ -249,3 +267,4 @@ with tab2:
 
         except Exception as e:
             st.error(f"Error processing file: {str(e)}")
+
