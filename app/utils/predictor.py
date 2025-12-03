@@ -63,24 +63,50 @@ class CreditRiskPredictor:
         except Exception as e:
             raise RuntimeError(f"Prediction failed: {str(e)}")
 
-    def predict_batch(self, X: pd.DataFrame, threshold: float = 0.5) -> pd.DataFrame:
+    def _get_risk_bins(self, threshold: float):
+        """
+        Return (bins, labels) for risk_score_percent based on decision threshold.
+        """
+        # Clamp threshold into [0.3, 0.7] just in case
+        t = max(0.3, min(0.7, threshold))
+
+        # Example scheme:
+        # - t=0.7 (lenient):   [0, 20, 35, 100]
+        # - t=0.5 (medium):    [0, 10, 25, 100]
+        # - t=0.3 (strict):    [0, 5, 15, 100]
+        alpha = (t - 0.3) / (0.7 - 0.3)
+
+        low_med = 5 + alpha * (20 - 5)
+        med_high = 15 + alpha * (35 - 15)
+
+        bins = [0, low_med, med_high, 100]
+        labels = ['Low Risk', 'Medium Risk', 'High Risk']
+        return bins, labels
+
+    def predict_batch(self, X, threshold=0.5):
+        """
+        Predict on batch of applications, with risk bins adapting to threshold.
+        """
         probs = self.predict_probability(X)
-        risk_scores = probs * 100
+        risk_scores = probs * 100  # Convert to percentage
+
+        # Apply threshold to get binary prediction
         risk_preds = (probs >= threshold).astype(int)
 
-        result = X.copy()
-        result["default_probability"] = probs
-        result["risk_score_percent"] = risk_scores
+        # Get dynamic bins based on threshold  <-- change is here
+        bins, labels = self._get_risk_bins(threshold)
 
-        # Use risk_score_percent to create bins
-        result["risk_category"] = pd.cut(
-            result["risk_score_percent"],
-            bins=[0, 10, 25, 100],
-            labels=["Low Risk", "Medium Risk", "High Risk"],
-            include_lowest=True,
-            right=True,
+        risk_category = pd.cut(
+            risk_scores,
+            bins=bins,
+            labels=labels,
+            include_lowest=True
         )
 
-        result["predicted_default"] = risk_preds
+        result = X.copy()
+        result['default_probability'] = probs
+        result['risk_score_percent'] = risk_scores
+        result['predicted_default'] = risk_preds
+        result['risk_category'] = risk_category
 
         return result
