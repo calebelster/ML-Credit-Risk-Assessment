@@ -126,7 +126,7 @@ class ModelVisualizations:
                 )
 
         fig.update_layout(
-            title="CV Metrics Across Folds",
+            title="CV Metrics Across Test Folds",
             xaxis_title="Fold",
             yaxis_title="Metric Value",
             height=500,
