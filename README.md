@@ -104,8 +104,9 @@ pip install -r requirements.txt
 # 3.3 Note on UV and Reproducibility
 
 The program runs through a **web-hosted Streamlit app**, and does not inherently require the user to develop a virtual environment with UV.
-
 However, the project can be run locally and provides full UV compatibility.
+
+
 ---
 
 # 4. Training & Evaluation Pipeline
