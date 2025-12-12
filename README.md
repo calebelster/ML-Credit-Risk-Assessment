@@ -33,24 +33,10 @@ ML-Credit-Risk-Assessment/
 │   │   └── plot_calibration.py
 │   └── process_data.py
 ├── output/
-│   ├── random_forest_preds.csv
-│   ├── grad_boost_preds.csv
-│   ├── log_reg_preds.csv
-│   ├── neural_net_preds.csv
-│   ├── ensemble_bagging_preds.csv
-│   ├── ensemble_voting_preds.csv
-│   ├── ensemble_stacking_preds.csv
-│   ├── ensemble_blending_preds.csv
-│   ├── random_forest_cv_metrics.csv
-│   ├── grad_boost_cv_metrics.csv
-│   ├── log_reg_cv_metrics.csv
-│   ├── neural_net_cv_metrics.csv
-│   ├── ensemble_bagging_cv_metrics.csv
-│   ├── ensemble_voting_cv_metrics.csv
-│   ├── ensemble_stacking_cv_metrics.csv
-│   └── ensemble_blending_cv_metrics.csv
+│   └── prediction files
 ├── app/
-│   ├── app.py
+│   ├── Home.py
+│   ├── __init__.py
 │   ├── saved_models/
 │   │   └── stacking_model.pkl
 │   ├── pages/
