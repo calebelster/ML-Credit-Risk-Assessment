@@ -70,29 +70,14 @@ Some features (e.g., `loan_grade`) are removed, both because they would not be k
 
 # 3. Setup
 
-## 3.1 Create a Virtual Environment
+# 3.1 Note on UV and Reproducibility
 
-```bash
-python -m venv .venv
-# Windows
-.\.venv\Scripts\activate
-# macOS / Linux
-source .venv/bin/activate
-```
-
-## 3.2 Install Dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
----
-
-# 3.3 Note on UV and Reproducibility
-
-The program runs through a **web-hosted Streamlit app**, and does not inherently require the user to develop a virtual environment with UV.
+The program runs through a **web-hosted Streamlit app** which is linked at the top of this file. It does not inherently require the user to develop a virtual environment with UV.
 However, the project can be run locally and provides full UV compatibility.
 
+# 3.2 Running Locally
+
+Check out the QUICKSTART.md file for instructions on how to begin your credit risk analysis locally.
 
 ---
 
@@ -168,24 +153,11 @@ Used for visualization on the Model Analysis page.
 
 ---
 
-# 5. Running the Streamlit App
-
-From the repo root:
-
-```bash
-cd app
-streamlit run Home.py
-```
-
-Open the URL shown in the terminal (usually `http://localhost:8501`).
-
----
-
-# 6. Risk Calculator (Page 1)
+# 5. Risk Calculator (Page 1)
 
 Two modes:
 
-### **6.1 Single Application**
+### **5.1 Single Application**
 
 User enters fields such as:
 
@@ -210,7 +182,7 @@ Outputs include:
 
 ---
 
-### **6.2 Batch Upload**
+### **5.2 Batch Upload**
 
 Upload `.csv` files.
 
@@ -235,11 +207,11 @@ Outputs:
 
 ---
 
-# 7. Model Analysis (Page 2)
+# 6. Model Analysis (Page 2)
 
 Three tabs:
 
-## 7.1 Cross-Validation
+## 6.1 Cross-Validation
 
 Displays metrics per fold for all models, including:
 
@@ -249,7 +221,7 @@ Displays metrics per fold for all models, including:
 * KS
 * LogLoss
 
-## 7.2 Test Performance
+## 6.2 Test Performance
 
 Metrics on the held-out test set:
 
@@ -258,7 +230,7 @@ Metrics on the held-out test set:
 * PR curve
 * F1, LogLoss
 
-## 7.3 Comparison
+## 6.3 Comparison
 
 Compares:
 
@@ -277,34 +249,9 @@ The **Stacking Ensemble** achieves:
 
 ---
 
-# 8. Deployment / WordPress Embedding (Optional)
+# 7. Validation & Class Balance
 
-Example embed:
-
-```html
-<iframe
-  src="https://your-app.streamlit.app/"
-  width="100%"
-  height="1200"
-  frameborder="0"
-  style="border: 1px solid #ddd; border-radius: 8px;">
-</iframe>
-```
-
----
-
-# 9. Notes & Assumptions
-
-* `loan_status = 1` means default
-* No financial/legal advice
-* `loan_grade` dropped to prevent leakage
-* Feedback is heuristic based on typical credit risk factors
-
----
-
-# 10. Validation & Class Balance
-
-## 10.1 Class Imbalance Strategy
+## 7.1 Class Imbalance Strategy
 
 The original dataset is heavily imbalanced, with far fewer defaults than non-defaults.
 To avoid bias toward predicting “no default,” we rebalanced the **training set only**:
@@ -317,9 +264,9 @@ This improves learning of default-related patterns while keeping evaluation unbi
 
 ---
 
-## 10.2 Validation Criteria
+## 7.2 Validation Criteria
 
-The project incorporates several measurable validation objectives:
+The project includes several measurable validation objectives:
 
 ### **Model-Level Validation**
 
@@ -341,7 +288,7 @@ The project incorporates several measurable validation objectives:
 
 ---
 
-# 11. Handling Incorrect or Missing Data
+# 8. Handling Incorrect or Missing Data
 
 We implemented several safeguards:
 
@@ -355,7 +302,7 @@ We implemented several safeguards:
 
 ---
 
-# 12. Automation Summary
+# 9. Automation Summary
 
 Our project satisfies the automation goals by:
 
@@ -379,7 +326,7 @@ Everything else runs with **one click**.
 
 ---
 
-# 13. Success Criteria
+# 10. Success Criteria
 
 Our project meets the following measurable targets:
 
