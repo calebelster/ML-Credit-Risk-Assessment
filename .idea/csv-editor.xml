@@ -10,34 +10,6 @@
             </Attribute>
           </value>
         </entry>
-        <entry key="\output\ensemble_bagging_preds.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
-        <entry key="\output\ensemble_blending_preds.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
-        <entry key="\output\ensemble_stacking_preds.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
-        <entry key="\output\ensemble_voting_preds.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
         <entry key="\output\grad_boost_preds.csv">
           <value>
             <Attribute>
@@ -66,21 +38,7 @@
             </Attribute>
           </value>
         </entry>
-        <entry key="\output\model_comparison_metrics.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
         <entry key="\output\neural_net_preds.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
-        <entry key="\output\random_forest_cv_metrics.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />
