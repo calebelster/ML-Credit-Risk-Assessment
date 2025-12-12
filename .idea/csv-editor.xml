@@ -10,6 +10,20 @@
             </Attribute>
           </value>
         </entry>
+        <entry key="\output\grad_boost_cv_metrics.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\output\grad_boost_importances.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
         <entry key="\output\grad_boost_preds.csv">
           <value>
             <Attribute>
@@ -18,6 +32,13 @@
           </value>
         </entry>
         <entry key="\output\log_reg_coefs.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\output\log_reg_cv_metrics.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />
@@ -38,7 +59,42 @@
             </Attribute>
           </value>
         </entry>
+        <entry key="\output\model_comparison_metrics.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\output\neural_net_cv_metrics.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
         <entry key="\output\neural_net_preds.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\output\random_forest_cv_metrics.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\output\random_forest_importances.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\output\random_forest_preds.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />
